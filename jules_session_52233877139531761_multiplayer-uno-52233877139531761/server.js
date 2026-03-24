@@ -12,23 +12,27 @@ app.use(express.static('public'));
 const rooms = {};
 
 // Simple in-memory database for users
-const usersDb = {}; // Key: username, Value: { coins: 0, wins: 0, skins: ['default'], equippedSkin: 'default' }
+const usersDb = {}; // Key: username, Value: { password: '', coins: 0, wins: 0, skins: ['default'], equippedSkin: 'default' }
 
 const SKINS = {
-    'default': { name: 'Default Avatar', price: 0 },
-    'ninja': { name: 'Ninja', price: 100 },
-    'pirate': { name: 'Pirate', price: 200 },
-    'robot': { name: 'Robot', price: 300 },
-    'king': { name: 'King', price: 500 }
+    'default': { name: 'Default', icon: '👤', price: 0 },
+    'dog': { name: 'Dog', icon: '🐶', price: 100 },
+    'cat': { name: 'Cat', icon: '🐱', price: 100 },
+    'fox': { name: 'Fox', icon: '🦊', price: 200 },
+    'panda': { name: 'Panda', icon: '🐼', price: 200 },
+    'unicorn': { name: 'Unicorn', icon: '🦄', price: 500 },
+    'dragon': { name: 'Dragon', icon: '🐉', price: 500 },
+    'alien': { name: 'Alien', icon: '👽', price: 1000 }
 };
 
 let colors = ['red', 'blue', 'green', 'yellow'];
 let values = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
 
-function createRoomState(roomId, name, maxPlayers, isPrivate, hostId) {
+function createRoomState(roomId, name, password, maxPlayers, isPrivate, hostId) {
     return {
         id: roomId,
         name: name || `Room ${roomId}`,
+        password: password || '',
         maxPlayers: maxPlayers || 4,
         isPrivate: isPrivate || false,
         hostId: hostId,
@@ -84,6 +88,7 @@ function getPublicRooms() {
         .map(r => ({
             id: r.id,
             name: r.name,
+            hasPassword: !!r.password,
             players: Object.keys(r.players).length,
             maxPlayers: r.maxPlayers
         }));
@@ -181,15 +186,9 @@ function playBotTurn(room) {
 
         // Find valid cards
         bot.hand.forEach((card, index) => {
-            let isValid = false;
-            if (room.activePenalty > 0) {
-                if (room.penaltyType === 'draw2' && card.value === 'draw2') isValid = true;
-                if (room.penaltyType === 'wild4' && card.value === 'wild4') isValid = true;
-            } else {
-                isValid = card.color === 'wild' ||
+            let isValid = card.color === 'wild' ||
                           card.color === room.activeColor ||
                           card.value === topCard.value;
-            }
             if (isValid) validCards.push({ card, index });
         });
 
@@ -232,12 +231,18 @@ function playBotTurn(room) {
                 if (playerIds.length === 2) nextTurn(room);
             } else if (cardToPlay.card.value === 'skip') {
                 nextTurn(room);
-            } else if (cardToPlay.card.value === 'draw2') {
-                room.activePenalty += 2;
-                room.penaltyType = 'draw2';
-            } else if (cardToPlay.card.value === 'wild4') {
-                room.activePenalty += 4;
-                room.penaltyType = 'wild4';
+            } else if (cardToPlay.card.value === 'draw2' || cardToPlay.card.value === 'wild4') {
+                const drawAmount = cardToPlay.card.value === 'draw2' ? 2 : 4;
+                nextTurn(room);
+                const victimId = playerIds[room.currentPlayerIndex];
+                const victim = room.players[victimId];
+                for(let i=0; i<drawAmount; i++) {
+                     if (room.deck.length === 0) {
+                         room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                         shuffleDeck(room);
+                     }
+                     if (room.deck.length > 0) victim.hand.push(room.deck.pop());
+                 }
             }
 
             // Check win
@@ -250,23 +255,11 @@ function playBotTurn(room) {
             broadcastGameState(room.id);
         } else {
             // Must draw
-            if (room.activePenalty > 0) {
-                 for(let i=0; i<room.activePenalty; i++) {
-                     if (room.deck.length === 0) {
-                         room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                         shuffleDeck(room);
-                     }
-                     if (room.deck.length > 0) bot.hand.push(room.deck.pop());
-                 }
-                 room.activePenalty = 0;
-                 room.penaltyType = null;
-             } else {
-                 if (room.deck.length === 0) {
-                    room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                    shuffleDeck(room);
-                 }
-                 if (room.deck.length > 0) bot.hand.push(room.deck.pop());
+             if (room.deck.length === 0) {
+                room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                shuffleDeck(room);
              }
+             if (room.deck.length > 0) bot.hand.push(room.deck.pop());
 
              nextTurn(room);
              broadcastGameState(room.id);
@@ -283,23 +276,35 @@ function nextTurn(room) {
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    socket.on('login', (username) => {
-        if (!username) username = `Guest_${Math.floor(Math.random() * 1000)}`;
+    socket.on('login', (username, password) => {
+        if (!username || !password) return;
 
         // Create user if not exists
         if (!usersDb[username]) {
             usersDb[username] = {
+                password: password, // In a real app, hash this!
                 coins: 0,
                 wins: 0,
                 skins: ['default'],
                 equippedSkin: 'default'
             };
+        } else {
+            // Check password
+            if (usersDb[username].password !== password) {
+                socket.emit('loginError', 'Incorrect password for this username.');
+                return;
+            }
         }
 
         socket.username = username; // Attach to socket for easy access
+
+        // Don't send password to client
+        const safeProfile = { ...usersDb[username] };
+        delete safeProfile.password;
+
         socket.emit('loginSuccess', {
             username: username,
-            profile: usersDb[username],
+            profile: safeProfile,
             shopItems: SKINS
         });
 
@@ -339,7 +344,7 @@ io.on('connection', (socket) => {
 
     socket.on('createRoom', (data) => {
         const roomId = Math.random().toString(36).substring(2, 8);
-        rooms[roomId] = createRoomState(roomId, data.name, data.maxPlayers, data.isPrivate, socket.id);
+        rooms[roomId] = createRoomState(roomId, data.name, data.password, data.maxPlayers, data.isPrivate, socket.id);
 
         socket.join(roomId);
 
@@ -362,9 +367,14 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('joinRoom', (roomId, playerName) => {
+    socket.on('joinRoom', (roomId, playerName, password) => {
         const room = rooms[roomId];
         if (room && !room.gameStarted && Object.keys(room.players).length < room.maxPlayers) {
+            if (room.password && room.password !== password) {
+                socket.emit('joinError', 'Incorrect room password.');
+                return;
+            }
+
             socket.join(roomId);
 
             const pName = socket.username || playerName || `Player ${Object.keys(room.players).length + 1}`;
@@ -393,12 +403,17 @@ io.on('connection', (socket) => {
         if (room && room.hostId === socket.id && !room.gameStarted && Object.keys(room.players).length < room.maxPlayers) {
             const botId = `bot_${Math.random().toString(36).substring(2, 8)}`;
             const botNum = Object.values(room.players).filter(p => p.isBot).length + 1;
+
+            // Randomly assign a bot an avatar
+            const botAvatars = ['dog', 'cat', 'fox', 'panda', 'alien'];
+            const botSkin = botAvatars[Math.floor(Math.random() * botAvatars.length)];
+
             room.players[botId] = {
                 name: `Bot ${botNum} (${difficulty})`,
                 hand: [],
                 isBot: true,
                 difficulty: difficulty,
-                equippedSkin: 'robot' // Visual skin for bots
+                equippedSkin: botSkin
             };
             io.to(roomId).emit('playerJoined', Object.values(room.players));
             if (!room.isPrivate) {
@@ -462,16 +477,9 @@ io.on('connection', (socket) => {
         const topCard = room.discardPile[room.discardPile.length - 1];
 
         // Basic Validation
-        let isValid = false;
-        if (room.activePenalty > 0) {
-            // Must play matching penalty card
-            if (room.penaltyType === 'draw2' && cardToPlay.value === 'draw2') isValid = true;
-            if (room.penaltyType === 'wild4' && cardToPlay.value === 'wild4') isValid = true;
-        } else {
-            isValid = cardToPlay.color === 'wild' ||
+        let isValid = cardToPlay.color === 'wild' ||
                       cardToPlay.color === room.activeColor ||
                       cardToPlay.value === topCard.value;
-        }
 
         if (isValid) {
             player.hand.splice(cardIndex, 1);
@@ -491,12 +499,20 @@ io.on('connection', (socket) => {
                 }
             } else if (cardToPlay.value === 'skip') {
                 nextTurn(room);
-            } else if (cardToPlay.value === 'draw2') {
-                room.activePenalty += 2;
-                room.penaltyType = 'draw2';
-            } else if (cardToPlay.value === 'wild4') {
-                room.activePenalty += 4;
-                room.penaltyType = 'wild4';
+            } else if (cardToPlay.value === 'draw2' || cardToPlay.value === 'wild4') {
+                const drawAmount = cardToPlay.value === 'draw2' ? 2 : 4;
+                nextTurn(room);
+                const victimId = playerIds[room.currentPlayerIndex];
+                const victim = room.players[victimId];
+                for(let i=0; i<drawAmount; i++) {
+                     if (room.deck.length === 0) {
+                         room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                         shuffleDeck(room);
+                     }
+                     if (room.deck.length > 0) {
+                         victim.hand.push(room.deck.pop());
+                     }
+                }
             }
 
             // Check win
@@ -517,32 +533,52 @@ io.on('connection', (socket) => {
          const playerIds = Object.keys(room.players);
          if (socket.id !== playerIds[room.currentPlayerIndex]) return;
 
-         if (room.activePenalty > 0) {
-             // Draw penalty cards
-             for(let i=0; i<room.activePenalty; i++) {
-                 if (room.deck.length === 0) {
-                     room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                     shuffleDeck(room);
-                 }
-                 if (room.deck.length > 0) {
-                     room.players[socket.id].hand.push(room.deck.pop());
-                 }
-             }
-             room.activePenalty = 0;
-             room.penaltyType = null;
-         } else {
-             // Draw single card
-             if (room.deck.length === 0) {
-                room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                shuffleDeck(room);
-             }
-             if (room.deck.length > 0) {
-                 room.players[socket.id].hand.push(room.deck.pop());
-             }
+         // Draw single card
+         if (room.deck.length === 0) {
+            room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+            shuffleDeck(room);
+         }
+         if (room.deck.length > 0) {
+             room.players[socket.id].hand.push(room.deck.pop());
          }
 
          nextTurn(room);
          broadcastGameState(roomId);
+    });
+
+    socket.on('chatMessage', (roomId, msg) => {
+        const username = socket.username || 'Player';
+        // Send chat to everyone in the room
+        io.to(roomId).emit('chatMessage', { sender: username, text: msg });
+    });
+
+    socket.on('sendEmote', (roomId, emote) => {
+        const username = socket.username || 'Player';
+        // Broadcast emote so it shows over the player's avatar
+        io.to(roomId).emit('playerEmote', { playerId: socket.id, emote: emote });
+    });
+
+    socket.on('playAgain', (roomId) => {
+        const room = rooms[roomId];
+        if (room && !room.gameStarted) {
+            // Keep players in the room but clear their hands
+            for (let playerId in room.players) {
+                room.players[playerId].hand = [];
+            }
+
+            // Notify ALL clients in the room to go back to the lobby screen
+            io.to(roomId).emit('returnToLobby');
+            io.to(roomId).emit('playerJoined', Object.values(room.players));
+
+            if (!room.isPrivate) {
+                io.emit('publicRooms', getPublicRooms());
+            }
+        }
+    });
+
+    socket.on('leaveRoom', (roomId) => {
+        handlePlayerLeave(roomId, socket.id);
+        socket.leave(roomId);
     });
 
     socket.on('disconnect', () => {
@@ -558,9 +594,15 @@ io.on('connection', (socket) => {
         }
 
         if (userRoomId) {
-            const room = rooms[userRoomId];
+            handlePlayerLeave(userRoomId, socket.id);
+        }
+    });
+
+    function handlePlayerLeave(userRoomId, playerId) {
+        const room = rooms[userRoomId];
+        if (!room) return;
             const playerIds = Object.keys(room.players);
-            
+
             if (room.gameStarted) {
                 const disconnectingPlayerIndex = playerIds.indexOf(socket.id);
 
@@ -605,14 +647,18 @@ io.on('connection', (socket) => {
                          room.currentPlayerIndex = 0;
                      }
                      broadcastGameState(userRoomId);
+                     // If the next player is a bot, ensure they take their turn
+                     const currentPlayerId = Object.keys(room.players)[room.currentPlayerIndex];
+                     if (room.players[currentPlayerId].isBot) {
+                         playBotTurn(room);
+                     }
                 } else {
                     io.to(userRoomId).emit('playerJoined', Object.values(room.players));
                 }
             }
 
             io.emit('publicRooms', getPublicRooms());
-        }
-    });
+    }
 });
 
 function getLeaderboard() {

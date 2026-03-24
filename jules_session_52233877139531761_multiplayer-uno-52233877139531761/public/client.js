@@ -13,11 +13,13 @@ const mainMenu = document.getElementById('main-menu');
 const displayUsername = document.getElementById('display-username');
 const displayCoins = document.getElementById('display-coins');
 const playerNameInput = document.getElementById('player-name');
+const playerPasswordInput = document.getElementById('player-password');
 
 const singleplayerBtn = document.getElementById('singleplayer-btn');
 const multiplayerBtn = document.getElementById('multiplayer-btn');
 const shopBtn = document.getElementById('shop-btn');
 const leaderboardBtn = document.getElementById('leaderboard-btn');
+const logoutBtn = document.getElementById('logout-btn');
 
 const shopModal = document.getElementById('shop-modal');
 const shopCoins = document.getElementById('shop-coins');
@@ -28,9 +30,15 @@ const leaderboardModal = document.getElementById('leaderboard-modal');
 const leaderboardTableBody = document.querySelector('#leaderboard-table tbody');
 const closeLeaderboardBtn = document.getElementById('close-leaderboard-btn');
 
+const chatContainer = document.getElementById('chat-container');
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatSendBtn = document.getElementById('chat-send-btn');
+const emojiBtns = document.querySelectorAll('.emoji-btn');
+
 const publicRoomsList = document.getElementById('public-rooms-list');
 const showCreateRoomBtn = document.getElementById('show-create-room-btn');
-const backToLoginBtn = document.getElementById('back-to-login-btn');
+const backToMenuFromBrowserBtn = document.getElementById('back-to-menu-from-browser-btn');
 const createRoomModal = document.getElementById('create-room-modal');
 const createRoomConfirmBtn = document.getElementById('create-room-confirm-btn');
 const createRoomCancelBtn = document.getElementById('create-room-cancel-btn');
@@ -42,7 +50,9 @@ const waitingMsg = document.getElementById('waiting-msg');
 const startBtn = document.getElementById('start-btn');
 const addBotBtn = document.getElementById('add-bot-btn');
 const botDifficultySelect = document.getElementById('bot-difficulty');
+const leaveLobbyBtn = document.getElementById('leave-lobby-btn');
 
+const leaveGameBtn = document.getElementById('leave-game-btn');
 const opponentsDiv = document.getElementById('opponents');
 const discardPileDiv = document.getElementById('discard-pile');
 const myHandDiv = document.getElementById('my-hand');
@@ -52,6 +62,7 @@ const myNameEl = document.getElementById('my-name');
 const colorPicker = document.getElementById('color-picker');
 const winnerMessage = document.getElementById('winner-message');
 const playAgainBtn = document.getElementById('play-again-btn');
+const backToMenuBtn = document.getElementById('back-to-menu-btn');
 const themeSelector = document.getElementById('theme-selector');
 
 // State
@@ -64,9 +75,42 @@ let myProfile = null;
 let shopData = null;
 
 // Event Listeners
+chatSendBtn.addEventListener('click', () => {
+    const msg = chatInput.value.trim();
+    if (msg && currentRoomId) {
+        socket.emit('chatMessage', currentRoomId, msg);
+        chatInput.value = '';
+    }
+});
+
+chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') chatSendBtn.click();
+});
+
+emojiBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const emote = e.target.textContent;
+        // If in game, send as floating emote too
+        if (currentRoomId && !gameScreen.classList.contains('hidden')) {
+            socket.emit('sendEmote', currentRoomId, emote);
+        }
+        // Also add to chat input just in case
+        chatInput.value += emote;
+    });
+});
+
 loginBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim();
-    socket.emit('login', name);
+    const pass = playerPasswordInput.value;
+    if (name && pass) {
+        socket.emit('login', name, pass);
+    } else {
+        alert("Please enter both username and password.");
+    }
+});
+
+socket.on('loginError', (msg) => {
+    alert(msg);
 });
 
 shopBtn.addEventListener('click', () => {
@@ -98,9 +142,35 @@ multiplayerBtn.addEventListener('click', () => {
     serverBrowserScreen.classList.remove('hidden');
 });
 
-backToLoginBtn.addEventListener('click', () => {
+logoutBtn.addEventListener('click', () => {
+    window.location.reload(); // Simplest way to cleanly reset all state
+});
+
+backToMenuFromBrowserBtn.addEventListener('click', () => {
     serverBrowserScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
+    mainMenu.classList.remove('hidden');
+    loginForm.classList.add('hidden');
+});
+
+leaveLobbyBtn.addEventListener('click', () => {
+    socket.emit('leaveRoom', currentRoomId);
+    currentRoomId = null;
+    isHost = false;
+    lobbyScreen.classList.add('hidden');
+    document.getElementById('chat-container').classList.add('hidden');
+    loginScreen.classList.remove('hidden');
+});
+
+leaveGameBtn.addEventListener('click', () => {
+    if (confirm("Are you sure you want to leave the game?")) {
+        socket.emit('leaveRoom', currentRoomId);
+        currentRoomId = null;
+        isHost = false;
+        gameScreen.classList.add('hidden');
+        document.getElementById('chat-container').classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+    }
 });
 
 showCreateRoomBtn.addEventListener('click', () => {
@@ -113,12 +183,13 @@ createRoomCancelBtn.addEventListener('click', () => {
 
 createRoomConfirmBtn.addEventListener('click', () => {
     const roomName = document.getElementById('room-name-input').value.trim();
+    const roomPassword = document.getElementById('room-password-input').value;
     const maxPlayers = parseInt(document.getElementById('room-max-players').value);
     const isPrivate = document.getElementById('room-private-checkbox').checked;
     const name = playerNameInput.value.trim() || 'Player';
 
     isHost = true;
-    socket.emit('createRoom', { name: roomName, maxPlayers, isPrivate, playerName: name });
+    socket.emit('createRoom', { name: roomName, password: roomPassword, maxPlayers, isPrivate, playerName: name });
     createRoomModal.classList.add('hidden');
     serverBrowserScreen.classList.add('hidden');
 });
@@ -143,6 +214,12 @@ deckDiv.addEventListener('click', () => {
 });
 
 playAgainBtn.addEventListener('click', () => {
+    if (currentRoomId) {
+        socket.emit('playAgain', currentRoomId);
+    }
+});
+
+backToMenuBtn.addEventListener('click', () => {
     gameOverScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     window.location.reload(); // Quick reset for simplicity
@@ -184,17 +261,23 @@ socket.on('publicRooms', (rooms) => {
             li.style.borderRadius = '3px';
 
             const info = document.createElement('span');
-            info.textContent = `${room.name} (${room.players}/${room.maxPlayers})`;
+            info.textContent = `${room.hasPassword ? '🔒 ' : ''}${room.name} (${room.players}/${room.maxPlayers})`;
 
             const joinBtn = document.createElement('button');
             joinBtn.textContent = 'Join';
             joinBtn.style.padding = '5px 10px';
             joinBtn.addEventListener('click', () => {
+                let password = '';
+                if (room.hasPassword) {
+                    password = prompt("Enter room password:");
+                    if (password === null) return; // User cancelled
+                }
+
                 const name = myProfile ? myProfile.username : 'Player';
                 isHost = false;
                 currentRoomId = room.id;
                 lobbyIdDisplay.textContent = `(ID: ${room.id})`;
-                socket.emit('joinRoom', room.id, name);
+                socket.emit('joinRoom', room.id, name, password);
             });
 
             li.appendChild(info);
@@ -276,12 +359,14 @@ socket.on('playerJoined', (players) => {
     loginScreen.classList.add('hidden');
     lobbyScreen.classList.remove('hidden');
 
+    // Show chat when joining lobby
+    document.getElementById('chat-container').classList.remove('hidden');
+
     playersList.innerHTML = '';
     players.forEach(p => {
         const li = document.createElement('li');
-        // Include skin in display if available
-        const skinText = p.equippedSkin && p.equippedSkin !== 'default' ? ` [${p.equippedSkin}]` : '';
-        li.textContent = `${p.name}${skinText}`;
+        const icon = (shopData && p.equippedSkin && shopData[p.equippedSkin]) ? shopData[p.equippedSkin].icon : '👤';
+        li.textContent = `${icon} ${p.name}`;
         playersList.appendChild(li);
     });
 
@@ -325,6 +410,45 @@ socket.on('gameState', (state) => {
     }
 });
 
+socket.on('chatMessage', (data) => {
+    const p = document.createElement('p');
+    const senderStrong = document.createElement('strong');
+    senderStrong.textContent = `${data.sender}: `;
+    const textNode = document.createTextNode(data.text);
+
+    p.appendChild(senderStrong);
+    p.appendChild(textNode);
+
+    chatMessages.appendChild(p);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+});
+
+socket.on('playerEmote', (data) => {
+    // Show floating emote over player
+    let targetEl = document.getElementById(`player-container-${data.playerId}`);
+
+    // If it's me, target my-hand area
+    if (data.playerId === myId) {
+        targetEl = document.querySelector('.player-area');
+    }
+
+    if (targetEl) {
+        const popup = document.createElement('div');
+        popup.className = 'emote-popup';
+        popup.textContent = data.emote;
+
+        // Random slight offsets so multiple emotes don't overlap perfectly
+        const randomOffsetX = (Math.random() - 0.5) * 40;
+        popup.style.left = `calc(50% + ${randomOffsetX}px)`;
+        popup.style.top = '10px';
+
+        targetEl.style.position = 'relative'; // ensure absolute positioning works
+        targetEl.appendChild(popup);
+
+        setTimeout(() => popup.remove(), 2000);
+    }
+});
+
 socket.on('gameOver', (data) => {
     gameScreen.classList.add('hidden');
     gameOverScreen.classList.remove('hidden');
@@ -333,6 +457,18 @@ socket.on('gameOver', (data) => {
     } else {
         winnerMessage.textContent = data.reason || 'Game Over';
     }
+});
+
+socket.on('returnToLobby', () => {
+    gameOverScreen.classList.add('hidden');
+    gameScreen.classList.add('hidden');
+    lobbyScreen.classList.remove('hidden');
+
+    // Clear game UI
+    myHandDiv.innerHTML = '';
+    discardPileDiv.innerHTML = '';
+    opponentsDiv.innerHTML = '';
+    myNameEl.textContent = 'My Hand';
 });
 
 // Render Functions
@@ -367,17 +503,31 @@ function handleCardPlay(card, index) {
     }
 }
 
+let previousHandSize = 0;
+
 function renderHand(hand) {
     myHandDiv.innerHTML = '';
+    const isDrawing = hand.length > previousHandSize;
+
     hand.forEach((card, index) => {
-        myHandDiv.appendChild(createCardElement(card, index));
+        const cardEl = createCardElement(card, index);
+        // Only animate the newly drawn card (assuming it's at the end of the hand)
+        if (isDrawing && index === hand.length - 1) {
+            cardEl.classList.add('drawn');
+        }
+        myHandDiv.appendChild(cardEl);
     });
+
+    previousHandSize = hand.length;
 }
 
 function renderDiscardPile(topCard, activeColor) {
     discardPileDiv.innerHTML = '';
     if (topCard) {
         const cardEl = createCardElement(topCard);
+        // Animate the card being played
+        cardEl.classList.add('played');
+
         if (topCard.color === 'wild' && activeColor) {
             // Visualize the chosen color for wild cards
             cardEl.style.boxShadow = `0 0 15px ${activeColor}`;
@@ -393,10 +543,17 @@ function renderOpponents(players) {
         if (p.id !== myId) {
             const oppDiv = document.createElement('div');
             oppDiv.className = `opponent ${p.isCurrentTurn ? 'active-turn' : ''}`;
+            oppDiv.id = `player-container-${p.id}`;
+
+            const icon = (shopData && p.equippedSkin && shopData[p.equippedSkin]) ? shopData[p.equippedSkin].icon : '👤';
             
+            const avatarEl = document.createElement('span');
+            avatarEl.className = 'player-avatar';
+            avatarEl.textContent = icon;
+            oppDiv.appendChild(avatarEl);
+
             const nameEl = document.createElement('strong');
-            const skinText = p.equippedSkin && p.equippedSkin !== 'default' ? ` [${p.equippedSkin}]` : '';
-            nameEl.textContent = `${p.name}${skinText}`;
+            nameEl.textContent = p.name;
             oppDiv.appendChild(nameEl);
             
             oppDiv.appendChild(document.createElement('br'));
@@ -417,12 +574,18 @@ function renderShop() {
         const div = document.createElement('div');
         div.className = 'shop-item';
 
+        const icon = document.createElement('span');
+        icon.className = 'avatar-icon';
+        icon.textContent = item.icon || '👤';
+
         const title = document.createElement('h4');
         title.style.margin = '0';
         title.textContent = item.name;
 
         const price = document.createElement('p');
         price.textContent = id === 'default' ? 'Free' : `${item.price} Coins`;
+
+        div.appendChild(icon);
 
         const actionBtn = document.createElement('button');
 

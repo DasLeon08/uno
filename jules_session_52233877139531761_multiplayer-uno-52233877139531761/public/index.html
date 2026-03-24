@@ -10,8 +10,9 @@
     <div id="login-screen" class="screen">
         <h1>Multiplayer UNO</h1>
         <div id="login-form">
-            <input type="text" id="player-name" placeholder="Enter your username to login" />
-            <button id="login-btn" style="margin-top: 10px;">Login</button>
+            <input type="text" id="player-name" placeholder="Enter your username" style="margin-bottom: 10px;" /><br>
+            <input type="password" id="player-password" placeholder="Enter your password" style="margin-bottom: 10px; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #ccc; outline: none;" /><br>
+            <button id="login-btn" style="margin-top: 10px;">Login / Register</button>
         </div>
 
         <div id="main-menu" class="hidden">
@@ -35,6 +36,9 @@
                     <option value="theme-dark">Dark Mode</option>
                     <option value="theme-neon">Neon</option>
                 </select>
+            </div>
+            <div class="menu-options" style="margin-top: 20px;">
+                <button id="logout-btn" class="btn" style="background-color: #e74c3c;">Logout</button>
             </div>
         </div>
     </div>
@@ -76,7 +80,7 @@
         <h2>Server Browser</h2>
         <div style="margin-bottom: 20px;">
             <button id="show-create-room-btn">Create Room</button>
-            <button id="back-to-login-btn">Back</button>
+            <button id="back-to-menu-from-browser-btn" class="btn" style="background-color: #e74c3c;">Back</button>
         </div>
         <ul id="public-rooms-list" style="max-height: 300px; overflow-y: auto; text-align: left; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px;">
             <li>No public rooms available.</li>
@@ -87,8 +91,9 @@
         <div class="modal-content" style="color: black;">
             <h3 style="color: white;">Create Room</h3>
             <input type="text" id="room-name-input" placeholder="Room Name" style="margin-bottom: 10px; width: 80%;"/><br>
+            <input type="password" id="room-password-input" placeholder="Room Password (Optional)" style="margin-bottom: 10px; width: 80%; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #ccc; outline: none;"/><br>
             <label style="color: white;">Max Players: <input type="number" id="room-max-players" value="4" min="2" max="10" style="width: 50px;"/></label><br><br>
-            <label style="color: white;"><input type="checkbox" id="room-private-checkbox" /> Private Room</label><br><br>
+            <label style="color: white;"><input type="checkbox" id="room-private-checkbox" /> Unlisted Room (Won't show in browser)</label><br><br>
             <button id="create-room-confirm-btn">Create</button>
             <button id="create-room-cancel-btn">Cancel</button>
         </div>
@@ -110,9 +115,11 @@
             <button id="start-btn">Start Game</button>
         </div>
         <p id="waiting-msg">Waiting for host to start...</p>
+        <button id="leave-lobby-btn" style="margin-top: 20px; background-color: #e74c3c;">Leave Lobby</button>
     </div>
 
     <div id="game-screen" class="screen hidden">
+        <button id="leave-game-btn" class="btn" style="position: absolute; top: 10px; left: 10px; padding: 5px 10px; background-color: #e74c3c; font-size: 14px; z-index: 1000;">Leave Game</button>
         <div id="opponents"></div>
         <div class="center-board">
             <div id="deck" class="card deck-card">UNO</div>
@@ -139,7 +146,28 @@
 
     <div id="game-over-screen" class="screen hidden">
         <h1 id="winner-message"></h1>
-        <button id="play-again-btn">Play Again</button>
+        <div class="game-over-buttons" style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+            <button id="play-again-btn" class="btn">Play Again</button>
+            <button id="back-to-menu-btn" class="btn" style="background-color: var(--danger-color);">Back to Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Chat Box UI -->
+    <div id="chat-container" class="chat-container hidden">
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-area">
+            <div class="emoji-bar">
+                <button class="emoji-btn">😂</button>
+                <button class="emoji-btn">😎</button>
+                <button class="emoji-btn">😡</button>
+                <button class="emoji-btn">😭</button>
+                <button class="emoji-btn">🔥</button>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="chat-input" placeholder="Type a message..." />
+                <button id="chat-send-btn">Send</button>
+            </div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
