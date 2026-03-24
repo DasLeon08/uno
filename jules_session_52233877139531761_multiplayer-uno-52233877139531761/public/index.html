@@ -10,13 +10,59 @@
     <div id="login-screen" class="screen">
         <h1>Multiplayer UNO</h1>
         <input type="text" id="player-name" placeholder="Enter your name" />
-        <button id="join-btn">Join Game</button>
+        <div class="menu-options" style="margin-top: 20px;">
+            <button id="singleplayer-btn">Singleplayer</button>
+            <button id="multiplayer-btn">Multiplayer</button>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <label>Skin: </label>
+            <select id="theme-selector">
+                <option value="theme-classic">Classic</option>
+                <option value="theme-dark">Dark Mode</option>
+                <option value="theme-neon">Neon</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="server-browser-screen" class="screen hidden">
+        <h2>Server Browser</h2>
+        <div style="margin-bottom: 20px;">
+            <button id="show-create-room-btn">Create Room</button>
+            <button id="back-to-login-btn">Back</button>
+        </div>
+        <ul id="public-rooms-list" style="max-height: 300px; overflow-y: auto; text-align: left; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px;">
+            <li>No public rooms available.</li>
+        </ul>
+    </div>
+
+    <div id="create-room-modal" class="modal hidden">
+        <div class="modal-content" style="color: black;">
+            <h3 style="color: white;">Create Room</h3>
+            <input type="text" id="room-name-input" placeholder="Room Name" style="margin-bottom: 10px; width: 80%;"/><br>
+            <label style="color: white;">Max Players: <input type="number" id="room-max-players" value="4" min="2" max="10" style="width: 50px;"/></label><br><br>
+            <label style="color: white;"><input type="checkbox" id="room-private-checkbox" /> Private Room</label><br><br>
+            <button id="create-room-confirm-btn">Create</button>
+            <button id="create-room-cancel-btn">Cancel</button>
+        </div>
     </div>
 
     <div id="lobby-screen" class="screen hidden">
-        <h2>Lobby</h2>
+        <h2>Lobby <span id="lobby-id-display" style="font-size: 0.6em; color: #ccc;"></span></h2>
         <ul id="players-list"></ul>
-        <button id="start-btn" class="hidden">Start Game</button>
+        <div id="host-controls" class="hidden" style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #555;">
+            <h4>Host Controls</h4>
+            <div style="margin-bottom: 10px;">
+                <select id="bot-difficulty">
+                    <option value="easy">Easy Bot</option>
+                    <option value="medium">Medium Bot</option>
+                    <option value="hard">Hard Bot</option>
+                </select>
+                <button id="add-bot-btn">Add Bot</button>
+            </div>
+            <button id="start-btn">Start Game</button>
+        </div>
+        <p id="waiting-msg">Waiting for host to start...</p>
     </div>
 
     <div id="game-screen" class="screen hidden">
