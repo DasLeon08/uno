@@ -1,2 +1,4 @@
 node_modules
 server_output.log
+
+database.sqlite

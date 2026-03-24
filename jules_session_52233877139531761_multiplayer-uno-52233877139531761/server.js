@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const db = require('./database'); // Import SQLite connection
 
 const app = express();
 const server = http.createServer(app);
@@ -10,9 +11,6 @@ app.use(express.static('public'));
 
 // Game State
 const rooms = {};
-
-// Simple in-memory database for users
-const usersDb = {}; // Key: username, Value: { password: '', coins: 0, wins: 0, skins: ['default'], equippedSkin: 'default' }
 
 const SKINS = {
     'default': { name: 'Default', icon: '👤', price: 0 },
@@ -52,29 +50,39 @@ function handleWin(room, roomId, winningPlayer, winningPlayerId) {
     const playerIds = Object.keys(room.players);
 
     // Award coins and update leaderboard
-    if (!winningPlayer.isBot && usersDb[winningPlayer.name]) {
-        usersDb[winningPlayer.name].wins += 1;
-        usersDb[winningPlayer.name].coins += 50; // Winner gets 50 coins
-
-        const winnerSocket = io.sockets.sockets.get(winningPlayerId);
-        if (winnerSocket) {
-            winnerSocket.emit('profileUpdate', usersDb[winningPlayer.name]);
-        }
+    if (!winningPlayer.isBot) {
+        db.run("UPDATE users SET wins = wins + 1, coins = coins + 50 WHERE username = ?", [winningPlayer.name], function(err) {
+            if (!err) {
+                db.get("SELECT coins, wins, skins, equippedSkin FROM users WHERE username = ?", [winningPlayer.name], (err, row) => {
+                    if (row) {
+                        const profile = { ...row, skins: JSON.parse(row.skins) };
+                        const winnerSocket = io.sockets.sockets.get(winningPlayerId);
+                        if (winnerSocket) winnerSocket.emit('profileUpdate', profile);
+                    }
+                    broadcastLeaderboard();
+                });
+            }
+        });
     }
 
     // Award participation coins to other humans
     playerIds.forEach(id => {
         const p = room.players[id];
-        if (!p.isBot && id !== winningPlayerId && usersDb[p.name]) {
-            usersDb[p.name].coins += 10;
-            const loserSocket = io.sockets.sockets.get(id);
-            if (loserSocket) {
-                loserSocket.emit('profileUpdate', usersDb[p.name]);
-            }
+        if (!p.isBot && id !== winningPlayerId) {
+            db.run("UPDATE users SET coins = coins + 10 WHERE username = ?", [p.name], function(err) {
+                if (!err) {
+                     db.get("SELECT coins, wins, skins, equippedSkin FROM users WHERE username = ?", [p.name], (err, row) => {
+                        if (row) {
+                             const profile = { ...row, skins: JSON.parse(row.skins) };
+                             const loserSocket = io.sockets.sockets.get(id);
+                             if (loserSocket) loserSocket.emit('profileUpdate', profile);
+                        }
+                     });
+                }
+            });
         }
     });
 
-    io.emit('leaderboardUpdate', getLeaderboard());
     io.to(roomId).emit('gameOver', { winnerName: winningPlayer.name });
     room.gameStarted = false;
     room.deck = [];
@@ -279,67 +287,88 @@ io.on('connection', (socket) => {
     socket.on('login', (username, password) => {
         if (!username || !password) return;
 
-        // Create user if not exists
-        if (!usersDb[username]) {
-            usersDb[username] = {
-                password: password, // In a real app, hash this!
-                coins: 0,
-                wins: 0,
-                skins: ['default'],
-                equippedSkin: 'default'
-            };
-        } else {
-            // Check password
-            if (usersDb[username].password !== password) {
-                socket.emit('loginError', 'Incorrect password for this username.');
+        db.get("SELECT * FROM users WHERE username = ?", [username], (err, row) => {
+            if (err) {
+                socket.emit('loginError', 'Database error.');
                 return;
             }
-        }
 
-        socket.username = username; // Attach to socket for easy access
+            if (!row) {
+                // Create user
+                const defaultSkins = JSON.stringify(['default']);
+                db.run("INSERT INTO users (username, password, coins, wins, skins, equippedSkin) VALUES (?, ?, ?, ?, ?, ?)",
+                    [username, password, 0, 0, defaultSkins, 'default'], function(err) {
+                        if (err) {
+                            socket.emit('loginError', 'Error creating user.');
+                        } else {
+                            handleLoginSuccess(socket, username, { coins: 0, wins: 0, skins: ['default'], equippedSkin: 'default' });
+                        }
+                    });
+            } else {
+                // Verify password
+                if (row.password !== password) {
+                    socket.emit('loginError', 'Incorrect password for this username.');
+                } else {
+                    handleLoginSuccess(socket, username, {
+                        coins: row.coins,
+                        wins: row.wins,
+                        skins: JSON.parse(row.skins),
+                        equippedSkin: row.equippedSkin
+                    });
+                }
+            }
+        });
+    });
 
-        // Don't send password to client
-        const safeProfile = { ...usersDb[username] };
-        delete safeProfile.password;
-
+    function handleLoginSuccess(socket, username, profile) {
+        socket.username = username;
         socket.emit('loginSuccess', {
             username: username,
-            profile: safeProfile,
+            profile: profile,
             shopItems: SKINS
         });
-
-        // Send leaderboard on login
-        socket.emit('leaderboardUpdate', getLeaderboard());
-
-        // Send public rooms
+        broadcastLeaderboard(socket);
         socket.emit('publicRooms', getPublicRooms());
-    });
+    }
 
     socket.on('buySkin', (skinId) => {
         const username = socket.username;
-        if (!username || !usersDb[username]) return;
+        if (!username) return;
 
-        const profile = usersDb[username];
-        const skin = SKINS[skinId];
+        db.get("SELECT coins, skins, equippedSkin FROM users WHERE username = ?", [username], (err, row) => {
+            if (err || !row) return;
 
-        if (skin && profile.coins >= skin.price && !profile.skins.includes(skinId)) {
-            profile.coins -= skin.price;
-            profile.skins.push(skinId);
-            socket.emit('profileUpdate', profile);
-        } else {
-            socket.emit('shopError', 'Not enough coins or already owned.');
-        }
+            const profile = { ...row, skins: JSON.parse(row.skins) };
+            const skin = SKINS[skinId];
+
+            if (skin && profile.coins >= skin.price && !profile.skins.includes(skinId)) {
+                profile.coins -= skin.price;
+                profile.skins.push(skinId);
+
+                db.run("UPDATE users SET coins = ?, skins = ? WHERE username = ?", [profile.coins, JSON.stringify(profile.skins), username], (err) => {
+                    if (!err) socket.emit('profileUpdate', profile);
+                });
+            } else {
+                socket.emit('shopError', 'Not enough coins or already owned.');
+            }
+        });
     });
 
     socket.on('equipSkin', (skinId) => {
         const username = socket.username;
-        if (!username || !usersDb[username]) return;
+        if (!username) return;
 
-        const profile = usersDb[username];
-        if (profile.skins.includes(skinId)) {
-            profile.equippedSkin = skinId;
-            socket.emit('profileUpdate', profile);
-        }
+        db.get("SELECT coins, skins, equippedSkin FROM users WHERE username = ?", [username], (err, row) => {
+             if (err || !row) return;
+
+             const profile = { ...row, skins: JSON.parse(row.skins) };
+             if (profile.skins.includes(skinId)) {
+                 profile.equippedSkin = skinId;
+                 db.run("UPDATE users SET equippedSkin = ? WHERE username = ?", [skinId, username], (err) => {
+                     if (!err) socket.emit('profileUpdate', profile);
+                 });
+             }
+        });
     });
 
     socket.on('createRoom', (data) => {
@@ -349,22 +378,24 @@ io.on('connection', (socket) => {
         socket.join(roomId);
 
         const hostName = socket.username || data.playerName || 'Host';
-        const hostSkin = usersDb[hostName] ? usersDb[hostName].equippedSkin : 'default';
 
-        rooms[roomId].players[socket.id] = {
-            name: hostName,
-            hand: [],
-            isBot: false,
-            equippedSkin: hostSkin
-        };
+        db.get("SELECT equippedSkin FROM users WHERE username = ?", [hostName], (err, row) => {
+            const hostSkin = row ? row.equippedSkin : 'default';
+            rooms[roomId].players[socket.id] = {
+                name: hostName,
+                hand: [],
+                isBot: false,
+                equippedSkin: hostSkin
+            };
 
-        socket.emit('roomCreated', roomId);
-        io.to(roomId).emit('playerJoined', Object.values(rooms[roomId].players));
+            socket.emit('roomCreated', roomId);
+            io.to(roomId).emit('playerJoined', Object.values(rooms[roomId].players));
 
-        // Update public lobby list for others
-        if (!data.isPrivate) {
-            io.emit('publicRooms', getPublicRooms());
-        }
+            // Update public lobby list for others
+            if (!data.isPrivate) {
+                io.emit('publicRooms', getPublicRooms());
+            }
+        });
     });
 
     socket.on('joinRoom', (roomId, playerName, password) => {
@@ -378,21 +409,24 @@ io.on('connection', (socket) => {
             socket.join(roomId);
 
             const pName = socket.username || playerName || `Player ${Object.keys(room.players).length + 1}`;
-            const equippedSkin = usersDb[pName] ? usersDb[pName].equippedSkin : 'default';
 
-            room.players[socket.id] = {
-                name: pName,
-                hand: [],
-                isBot: false,
-                equippedSkin: equippedSkin
-            };
-            io.to(roomId).emit('playerJoined', Object.values(room.players));
-            broadcastGameState(roomId);
+            db.get("SELECT equippedSkin FROM users WHERE username = ?", [pName], (err, row) => {
+                const equippedSkin = row ? row.equippedSkin : 'default';
 
-            // Update public lobby list for others
-            if (!room.isPrivate) {
-                io.emit('publicRooms', getPublicRooms());
-            }
+                room.players[socket.id] = {
+                    name: pName,
+                    hand: [],
+                    isBot: false,
+                    equippedSkin: equippedSkin
+                };
+                io.to(roomId).emit('playerJoined', Object.values(room.players));
+                broadcastGameState(roomId);
+
+                // Update public lobby list for others
+                if (!room.isPrivate) {
+                    io.emit('publicRooms', getPublicRooms());
+                }
+            });
         } else {
             socket.emit('joinError', 'Room not found, full, or game started.');
         }
@@ -661,14 +695,12 @@ io.on('connection', (socket) => {
     }
 });
 
-function getLeaderboard() {
-    return Object.entries(usersDb)
-        .map(([username, data]) => ({ username, wins: data.wins, coins: data.coins }))
-        .sort((a, b) => {
-            if (b.wins !== a.wins) return b.wins - a.wins;
-            return b.coins - a.coins;
-        })
-        .slice(0, 10);
+function broadcastLeaderboard(socketTarget = io) {
+    db.all("SELECT username, wins, coins FROM users ORDER BY wins DESC, coins DESC LIMIT 10", [], (err, rows) => {
+        if (!err && rows) {
+            socketTarget.emit('leaderboardUpdate', rows);
+        }
+    });
 }
 
 const PORT = process.env.PORT || 3000;
