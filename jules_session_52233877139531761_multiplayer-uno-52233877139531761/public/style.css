@@ -232,6 +232,50 @@ li {
     text-shadow: 0 0 5px #f1c40f;
 }
 
+/* Shop Layout */
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.shop-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #555;
+    color: white;
+}
+
+.shop-item h4 {
+    margin-bottom: 5px;
+}
+
+.shop-item button {
+    margin-top: 10px;
+    width: 100%;
+    padding: 8px;
+    font-size: 14px;
+}
+
+.shop-item button:disabled {
+    background-color: #555;
+    cursor: not-allowed;
+}
+
+/* Leaderboard */
+#leaderboard-table th, #leaderboard-table td {
+    padding: 10px;
+    text-align: left;
+}
+#leaderboard-table tbody tr:nth-child(even) {
+    background-color: rgba(255,255,255,0.05);
+}
+
 /* Color Picker Modal */
 .modal {
     position: fixed;

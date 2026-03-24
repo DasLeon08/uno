@@ -9,19 +9,66 @@
 <body>
     <div id="login-screen" class="screen">
         <h1>Multiplayer UNO</h1>
-        <input type="text" id="player-name" placeholder="Enter your name" />
-        <div class="menu-options" style="margin-top: 20px;">
-            <button id="singleplayer-btn">Singleplayer</button>
-            <button id="multiplayer-btn">Multiplayer</button>
+        <div id="login-form">
+            <input type="text" id="player-name" placeholder="Enter your username to login" />
+            <button id="login-btn" style="margin-top: 10px;">Login</button>
         </div>
 
-        <div style="margin-top: 20px;">
-            <label>Skin: </label>
-            <select id="theme-selector">
-                <option value="theme-classic">Classic</option>
-                <option value="theme-dark">Dark Mode</option>
-                <option value="theme-neon">Neon</option>
-            </select>
+        <div id="main-menu" class="hidden">
+            <div id="profile-info" style="margin-bottom: 20px; font-weight: bold; font-size: 1.2em;">
+                Welcome, <span id="display-username"></span>! | Coins: <span id="display-coins">0</span> 🪙
+            </div>
+
+            <div class="menu-options">
+                <button id="singleplayer-btn">Singleplayer</button>
+                <button id="multiplayer-btn">Multiplayer</button>
+            </div>
+            <div class="menu-options" style="margin-top: 10px;">
+                <button id="shop-btn">Item Shop</button>
+                <button id="leaderboard-btn">Leaderboard</button>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <label>Theme: </label>
+                <select id="theme-selector">
+                    <option value="theme-classic">Classic</option>
+                    <option value="theme-dark">Dark Mode</option>
+                    <option value="theme-neon">Neon</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Modal -->
+    <div id="shop-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px; color: black;">
+            <h2 style="color: white;">Item Shop 🛒</h2>
+            <p style="color: gold;">Your Coins: <span id="shop-coins">0</span></p>
+            <div id="shop-items" class="shop-grid">
+                <!-- Shop items injected here -->
+            </div>
+            <button id="close-shop-btn" style="margin-top: 20px;">Close Shop</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px; color: black;">
+            <h2 style="color: white;">Leaderboard 🏆</h2>
+            <table id="leaderboard-table" style="width: 100%; color: white; margin-top: 10px; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid white;">
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Wins</th>
+                        <th>Coins</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Leaderboard entries injected here -->
+                </tbody>
+            </table>
+            <button id="close-leaderboard-btn" style="margin-top: 20px;">Close Leaderboard</button>
         </div>
     </div>
 

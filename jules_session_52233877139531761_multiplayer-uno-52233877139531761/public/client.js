@@ -7,9 +7,26 @@ const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 
+const loginForm = document.getElementById('login-form');
+const loginBtn = document.getElementById('login-btn');
+const mainMenu = document.getElementById('main-menu');
+const displayUsername = document.getElementById('display-username');
+const displayCoins = document.getElementById('display-coins');
 const playerNameInput = document.getElementById('player-name');
+
 const singleplayerBtn = document.getElementById('singleplayer-btn');
 const multiplayerBtn = document.getElementById('multiplayer-btn');
+const shopBtn = document.getElementById('shop-btn');
+const leaderboardBtn = document.getElementById('leaderboard-btn');
+
+const shopModal = document.getElementById('shop-modal');
+const shopCoins = document.getElementById('shop-coins');
+const shopItemsContainer = document.getElementById('shop-items');
+const closeShopBtn = document.getElementById('close-shop-btn');
+
+const leaderboardModal = document.getElementById('leaderboard-modal');
+const leaderboardTableBody = document.querySelector('#leaderboard-table tbody');
+const closeLeaderboardBtn = document.getElementById('close-leaderboard-btn');
 
 const publicRoomsList = document.getElementById('public-rooms-list');
 const showCreateRoomBtn = document.getElementById('show-create-room-btn');
@@ -43,10 +60,34 @@ let currentRoomId = null;
 let isHost = false;
 let isMyTurn = false;
 let pendingWildCardIndex = null;
+let myProfile = null;
+let shopData = null;
 
 // Event Listeners
+loginBtn.addEventListener('click', () => {
+    const name = playerNameInput.value.trim();
+    socket.emit('login', name);
+});
+
+shopBtn.addEventListener('click', () => {
+    shopModal.classList.remove('hidden');
+    renderShop();
+});
+
+closeShopBtn.addEventListener('click', () => {
+    shopModal.classList.add('hidden');
+});
+
+leaderboardBtn.addEventListener('click', () => {
+    leaderboardModal.classList.remove('hidden');
+});
+
+closeLeaderboardBtn.addEventListener('click', () => {
+    leaderboardModal.classList.add('hidden');
+});
+
 singleplayerBtn.addEventListener('click', () => {
-    const name = playerNameInput.value.trim() || 'Player';
+    const name = myProfile ? myProfile.username : 'Player';
     isHost = true;
     socket.emit('createRoom', { name: `${name}'s Game`, maxPlayers: 4, isPrivate: true, playerName: name });
     loginScreen.classList.add('hidden');
@@ -149,7 +190,7 @@ socket.on('publicRooms', (rooms) => {
             joinBtn.textContent = 'Join';
             joinBtn.style.padding = '5px 10px';
             joinBtn.addEventListener('click', () => {
-                const name = playerNameInput.value.trim() || 'Player';
+                const name = myProfile ? myProfile.username : 'Player';
                 isHost = false;
                 currentRoomId = room.id;
                 lobbyIdDisplay.textContent = `(ID: ${room.id})`;
@@ -181,19 +222,70 @@ socket.on('joinError', (msg) => {
     alert(msg);
 });
 
-socket.on('playerJoined', (playerNames) => {
+socket.on('loginSuccess', (data) => {
+    myProfile = { username: data.username, ...data.profile };
+    shopData = data.shopItems;
+
+    displayUsername.textContent = myProfile.username;
+    displayCoins.textContent = myProfile.coins;
+    shopCoins.textContent = myProfile.coins;
+
+    loginForm.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+});
+
+socket.on('profileUpdate', (profile) => {
+    myProfile = { ...myProfile, ...profile };
+    displayCoins.textContent = myProfile.coins;
+    shopCoins.textContent = myProfile.coins;
+    renderShop();
+});
+
+socket.on('shopError', (msg) => {
+    alert(msg);
+});
+
+socket.on('leaderboardUpdate', (entries) => {
+    leaderboardTableBody.innerHTML = '';
+    entries.forEach((entry, index) => {
+        const tr = document.createElement('tr');
+
+        const tdRank = document.createElement('td');
+        tdRank.textContent = index + 1;
+
+        const tdUsername = document.createElement('td');
+        tdUsername.textContent = entry.username;
+
+        const tdWins = document.createElement('td');
+        tdWins.textContent = entry.wins;
+
+        const tdCoins = document.createElement('td');
+        tdCoins.textContent = entry.coins;
+
+        tr.appendChild(tdRank);
+        tr.appendChild(tdUsername);
+        tr.appendChild(tdWins);
+        tr.appendChild(tdCoins);
+
+        leaderboardTableBody.appendChild(tr);
+    });
+});
+
+socket.on('playerJoined', (players) => {
     serverBrowserScreen.classList.add('hidden');
     loginScreen.classList.add('hidden');
     lobbyScreen.classList.remove('hidden');
 
     playersList.innerHTML = '';
-    playerNames.forEach(name => {
+    players.forEach(p => {
         const li = document.createElement('li');
-        li.textContent = name;
+        // Include skin in display if available
+        const skinText = p.equippedSkin && p.equippedSkin !== 'default' ? ` [${p.equippedSkin}]` : '';
+        li.textContent = `${p.name}${skinText}`;
         playersList.appendChild(li);
     });
 
-    if (playerNames.length >= 2 && isHost) {
+    if (players.length >= 2 && isHost) {
         startBtn.classList.remove('hidden');
     } else if (isHost) {
         startBtn.classList.add('hidden');
@@ -303,7 +395,8 @@ function renderOpponents(players) {
             oppDiv.className = `opponent ${p.isCurrentTurn ? 'active-turn' : ''}`;
             
             const nameEl = document.createElement('strong');
-            nameEl.textContent = p.name;
+            const skinText = p.equippedSkin && p.equippedSkin !== 'default' ? ` [${p.equippedSkin}]` : '';
+            nameEl.textContent = `${p.name}${skinText}`;
             oppDiv.appendChild(nameEl);
             
             oppDiv.appendChild(document.createElement('br'));
@@ -314,4 +407,44 @@ function renderOpponents(players) {
             opponentsDiv.appendChild(oppDiv);
         }
     });
+}
+
+function renderShop() {
+    if (!shopData || !myProfile) return;
+
+    shopItemsContainer.innerHTML = '';
+    for (const [id, item] of Object.entries(shopData)) {
+        const div = document.createElement('div');
+        div.className = 'shop-item';
+
+        const title = document.createElement('h4');
+        title.style.margin = '0';
+        title.textContent = item.name;
+
+        const price = document.createElement('p');
+        price.textContent = id === 'default' ? 'Free' : `${item.price} Coins`;
+
+        const actionBtn = document.createElement('button');
+
+        if (myProfile.skins.includes(id)) {
+            if (myProfile.equippedSkin === id) {
+                actionBtn.textContent = 'Equipped';
+                actionBtn.disabled = true;
+            } else {
+                actionBtn.textContent = 'Equip';
+                actionBtn.addEventListener('click', () => socket.emit('equipSkin', id));
+            }
+        } else {
+            actionBtn.textContent = 'Buy';
+            actionBtn.addEventListener('click', () => socket.emit('buySkin', id));
+            if (myProfile.coins < item.price) {
+                actionBtn.disabled = true;
+            }
+        }
+
+        div.appendChild(title);
+        div.appendChild(price);
+        div.appendChild(actionBtn);
+        shopItemsContainer.appendChild(div);
+    }
 }
