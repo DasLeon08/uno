@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,8 +12,27 @@ app.use(express.static('public'));
 // Game State
 const rooms = {};
 
+const DB_FILE = 'users.json';
+
 // Simple in-memory database for users
-const usersDb = {}; // Key: username, Value: { password: '', coins: 0, wins: 0, skins: ['default'], equippedSkin: 'default' }
+let usersDb = {}; // Key: username, Value: { password: '', coins: 0, wins: 0, skins: ['default'], equippedSkin: 'default' }
+
+if (fs.existsSync(DB_FILE)) {
+    try {
+        const data = fs.readFileSync(DB_FILE, 'utf8');
+        usersDb = JSON.parse(data);
+    } catch (err) {
+        console.error('Error reading users database:', err);
+    }
+}
+
+function saveUsers() {
+    try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(usersDb, null, 2), 'utf8');
+    } catch (err) {
+        console.error('Error saving users database:', err);
+    }
+}
 
 const SKINS = {
     'default': { name: 'Default', icon: '👤', price: 0 },
@@ -73,6 +93,8 @@ function handleWin(room, roomId, winningPlayer, winningPlayerId) {
             }
         }
     });
+
+    saveUsers();
 
     io.emit('leaderboardUpdate', getLeaderboard());
     io.to(roomId).emit('gameOver', { winnerName: winningPlayer.name });
@@ -288,6 +310,7 @@ io.on('connection', (socket) => {
                 skins: ['default'],
                 equippedSkin: 'default'
             };
+            saveUsers();
         } else {
             // Check password
             if (usersDb[username].password !== password) {
@@ -325,6 +348,7 @@ io.on('connection', (socket) => {
         if (skin && profile.coins >= skin.price && !profile.skins.includes(skinId)) {
             profile.coins -= skin.price;
             profile.skins.push(skinId);
+            saveUsers();
             socket.emit('profileUpdate', profile);
         } else {
             socket.emit('shopError', 'Not enough coins or already owned.');
@@ -338,6 +362,7 @@ io.on('connection', (socket) => {
         const profile = usersDb[username];
         if (profile.skins.includes(skinId)) {
             profile.equippedSkin = skinId;
+            saveUsers();
             socket.emit('profileUpdate', profile);
         }
     });
