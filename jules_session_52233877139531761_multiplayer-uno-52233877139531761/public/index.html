@@ -8,6 +8,7 @@
 </head>
 <body>
     <div id="login-screen" class="screen">
+        <button id="sound-toggle-btn" class="btn" style="position: absolute; top: 10px; right: 10px; font-size: 24px; background: transparent; border: none; box-shadow: none; z-index: 1000; cursor: pointer;">🔊</button>
         <h1>Multiplayer UNO</h1>
         <div id="login-form">
             <input type="text" id="player-name" placeholder="Enter your username" style="margin-bottom: 10px;" /><br>
@@ -17,7 +18,16 @@
 
         <div id="main-menu" class="hidden">
             <div id="profile-info" style="margin-bottom: 20px; font-weight: bold; font-size: 1.2em;">
-                Welcome, <span id="display-username"></span>! | Coins: <span id="display-coins">0</span> 🪙
+                Welcome, <span id="display-username"></span>! | <span id="display-title" style="color: #f1c40f; font-size: 0.9em;"></span><br>
+                Lvl: <span id="display-level">1</span> (XP: <span id="display-xp">0</span>) | Coins: <span id="display-coins">0</span> 🪙
+            </div>
+
+            <!-- Daily Quests Section -->
+            <div id="quests-container" style="margin-bottom: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.5); border-radius: 8px;">
+                <h3 style="margin: 0 0 10px 0; color: #f1c40f;">Daily Quests</h3>
+                <div id="quest-list" style="font-size: 0.9em; display: flex; flex-direction: column; gap: 5px;">
+                    <!-- Quests injected here -->
+                </div>
             </div>
 
             <div class="menu-options">
@@ -40,6 +50,19 @@
                     <option value="theme-sunset">Sunset</option>
                 </select>
             </div>
+
+            <!-- Friend List Panel -->
+            <div id="friend-list-panel" style="margin-top: 20px; text-align: left; padding: 10px; background: rgba(0,0,0,0.5); border-radius: 8px;">
+                <h3 style="margin: 0 0 10px 0; color: #f1c40f;">Friends List</h3>
+                <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                    <input type="text" id="friend-name-input" placeholder="Add Friend by Username" style="flex-grow: 1; padding: 8px; font-size: 14px;" />
+                    <button id="add-friend-btn" style="padding: 8px; font-size: 14px;">Add</button>
+                </div>
+                <ul id="friends-list" style="margin: 0; padding-left: 10px; list-style: none; font-size: 0.9em; max-height: 100px; overflow-y: auto;">
+                    <!-- Friends injected here -->
+                </ul>
+            </div>
+
             <div class="menu-options" style="margin-top: 20px;">
                 <button id="logout-btn" class="btn" style="background-color: #e74c3c;">Logout</button>
             </div>
@@ -60,13 +83,15 @@
 
     <!-- Leaderboard Modal -->
     <div id="leaderboard-modal" class="modal hidden">
-        <div class="modal-content" style="max-width: 500px; color: black;">
+        <div class="modal-content" style="max-width: 700px; color: black;">
             <h2 style="color: white;">Leaderboard 🏆</h2>
             <table id="leaderboard-table" style="width: 100%; color: white; margin-top: 10px; border-collapse: collapse;">
                 <thead>
                     <tr style="border-bottom: 1px solid white;">
                         <th>Rank</th>
                         <th>Player</th>
+                        <th>Level</th>
+                        <th>Title</th>
                         <th>Wins</th>
                         <th>Games Played</th>
                         <th>Win Rate</th>
@@ -104,7 +129,12 @@
             <label style="color: white;"><input type="checkbox" id="room-speed-checkbox" /> Speed Mode (15s Turns)</label><br>
             <label style="color: white;"><input type="checkbox" id="room-nomercy-checkbox" /> No Mercy Mode (Stacking Penalties)</label><br>
             <label style="color: white;"><input type="checkbox" id="room-ranked-checkbox" /> Ranked Mode (Affects MMR)</label><br>
-            <label style="color: white;"><input type="checkbox" id="room-zero-seven-checkbox" /> 0-7 Rule Mode (0 = Rotate, 7 = Swap)</label><br><br>
+            <label style="color: white;"><input type="checkbox" id="room-zero-seven-checkbox" /> 0-7 Rule Mode (0 = Rotate, 7 = Swap)</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-jumpin-checkbox" /> Jump-In (Play matching card out of turn)</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-drawuntilplay-checkbox" /> Draw Until Play</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-wildroulette-checkbox" /> Wild Roulette (Random effect on Wild)</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-team-checkbox" /> Team Mode (2v2)</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-combinations-checkbox" /> Card Combinations (Play multiple matching numbers)</label><br><br>
 
             <button id="create-room-confirm-btn">Create</button>
             <button id="create-room-cancel-btn">Cancel</button>
@@ -143,6 +173,9 @@
                 <div id="timer-bar" style="height: 100%; width: 100%; background-color: #2ecc71; transition: width 1s linear;"></div>
             </div>
             <div id="my-hand" class="hand"></div>
+            <button id="play-combo-btn" class="btn hidden" style="background-color: #8e44ad; margin-top: 10px;">Play Selected</button>
+            <button id="call-uno-btn" class="btn hidden" style="background-color: #f39c12; margin-top: 10px;">UNO!</button>
+            <button id="pass-turn-btn" class="btn hidden" style="background-color: #7f8c8d; margin-top: 10px;">Pass Turn</button>
         </div>
         
         <!-- Modal for selecting color after playing wild card -->

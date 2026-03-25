@@ -1,99 +1,31 @@
 {
-  "TestUser": {
-    "password": "password123",
+  "TestUser1": {
+    "password": "password",
     "coins": 20,
     "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
     "skins": [
       "defaultAvatar",
       "defaultChatColor",
-      "defaultCardBack"
+      "defaultCardBack",
+      "defaultVictory"
     ],
     "equippedAvatar": "defaultAvatar",
     "equippedChatColor": "defaultChatColor",
     "equippedCardBack": "defaultCardBack",
-    "gamesPlayed": 0,
-    "lastLoginDate": "2026-03-25"
-  },
-  "TestUser2": {
-    "password": "password123",
-    "coins": 0,
-    "wins": 0,
-    "skins": [
-      "defaultAvatar",
-      "defaultChatColor",
-      "defaultCardBack"
-    ],
-    "equippedAvatar": "defaultAvatar",
-    "equippedChatColor": "defaultChatColor",
-    "equippedCardBack": "defaultCardBack"
-  },
-  "TestUser3": {
-    "password": "password123",
-    "coins": 0,
-    "wins": 0,
-    "skins": [
-      "defaultAvatar",
-      "defaultChatColor",
-      "defaultCardBack"
-    ],
-    "equippedAvatar": "defaultAvatar",
-    "equippedChatColor": "defaultChatColor",
-    "equippedCardBack": "defaultCardBack"
-  },
-  "TestUser4": {
-    "password": "password123",
-    "coins": 0,
-    "wins": 0,
-    "skins": [
-      "defaultAvatar",
-      "defaultChatColor",
-      "defaultCardBack"
-    ],
-    "equippedAvatar": "defaultAvatar",
-    "equippedChatColor": "defaultChatColor",
-    "equippedCardBack": "defaultCardBack"
-  },
-  "TestUser5": {
-    "password": "password123",
-    "coins": 0,
-    "wins": 0,
-    "skins": [
-      "defaultAvatar",
-      "defaultChatColor",
-      "defaultCardBack"
-    ],
-    "equippedAvatar": "defaultAvatar",
-    "equippedChatColor": "defaultChatColor",
-    "equippedCardBack": "defaultCardBack"
-  },
-  "TestUser9": {
-    "password": "password123",
-    "coins": 20,
-    "wins": 0,
-    "gamesPlayed": 0,
-    "skins": [
-      "defaultAvatar",
-      "defaultChatColor",
-      "defaultCardBack"
-    ],
-    "equippedAvatar": "defaultAvatar",
-    "equippedChatColor": "defaultChatColor",
-    "equippedCardBack": "defaultCardBack",
-    "lastLoginDate": "2026-03-25"
-  },
-  "TestUser10": {
-    "password": "password123",
-    "coins": 20,
-    "wins": 0,
-    "gamesPlayed": 0,
-    "skins": [
-      "defaultAvatar",
-      "defaultChatColor",
-      "defaultCardBack"
-    ],
-    "equippedAvatar": "defaultAvatar",
-    "equippedChatColor": "defaultChatColor",
-    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
     "lastLoginDate": "2026-03-25"
   }
 }

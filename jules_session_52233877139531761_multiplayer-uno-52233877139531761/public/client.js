@@ -2,8 +2,10 @@ const socket = io();
 
 // --- Audio System (Web Audio API) ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let isMuted = false;
 
 function playTone(frequency, type, duration, vol=0.1) {
+    if (isMuted) return;
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
@@ -79,6 +81,36 @@ function triggerConfetti() {
     }
 }
 
+function triggerFireworks() {
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+    for (let i = 0; i < 20; i++) {
+        setTimeout(() => {
+            const fw = document.createElement('div');
+            fw.classList.add('firework');
+            fw.style.left = Math.random() * 100 + 'vw';
+            fw.style.top = Math.random() * 100 + 'vh';
+            fw.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            document.body.appendChild(fw);
+            setTimeout(() => fw.remove(), 1000);
+        }, Math.random() * 2000);
+    }
+}
+
+function triggerMatrixRain() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789$+-*/=%\"'#&_(),.;:?!\\|{}<>[]^~";
+    for (let i = 0; i < 100; i++) {
+        setTimeout(() => {
+            const drop = document.createElement('div');
+            drop.classList.add('matrix-drop');
+            drop.style.left = Math.random() * 100 + 'vw';
+            drop.style.top = '-20px';
+            drop.textContent = chars[Math.floor(Math.random() * chars.length)];
+            document.body.appendChild(drop);
+            setTimeout(() => drop.remove(), 3000); // fall animation duration
+        }, Math.random() * 3000);
+    }
+}
+
 function triggerShake() {
     document.body.classList.add('shake-animation');
     setTimeout(() => {
@@ -106,6 +138,13 @@ const loginBtn = document.getElementById('login-btn');
 const mainMenu = document.getElementById('main-menu');
 const displayUsername = document.getElementById('display-username');
 const displayCoins = document.getElementById('display-coins');
+const displayLevel = document.getElementById('display-level');
+const displayXp = document.getElementById('display-xp');
+const displayTitle = document.getElementById('display-title');
+const questList = document.getElementById('quest-list');
+const friendsList = document.getElementById('friends-list');
+const addFriendBtn = document.getElementById('add-friend-btn');
+const friendNameInput = document.getElementById('friend-name-input');
 const playerNameInput = document.getElementById('player-name');
 const playerPasswordInput = document.getElementById('player-password');
 
@@ -294,6 +333,11 @@ createRoomConfirmBtn.addEventListener('click', () => {
     const noMercyMode = document.getElementById('room-nomercy-checkbox').checked;
     const rankedMode = document.getElementById('room-ranked-checkbox').checked;
     const zeroSevenMode = document.getElementById('room-zero-seven-checkbox').checked;
+    const jumpInMode = document.getElementById('room-jumpin-checkbox').checked;
+    const drawUntilPlayMode = document.getElementById('room-drawuntilplay-checkbox').checked;
+    const wildRouletteMode = document.getElementById('room-wildroulette-checkbox').checked;
+    const teamMode = document.getElementById('room-team-checkbox').checked;
+    const combinationsMode = document.getElementById('room-combinations-checkbox').checked;
     const name = playerNameInput.value.trim() || 'Player';
 
     isHost = true;
@@ -306,6 +350,11 @@ createRoomConfirmBtn.addEventListener('click', () => {
         noMercyMode,
         rankedMode,
         zeroSevenMode,
+        jumpInMode,
+        drawUntilPlayMode,
+        wildRouletteMode,
+        teamMode,
+        combinationsMode,
         playerName: name
     });
     createRoomModal.classList.add('hidden');
@@ -341,6 +390,28 @@ if (passTurnBtn) {
     });
 }
 
+const soundToggleBtn = document.getElementById('sound-toggle-btn');
+if (soundToggleBtn) {
+    soundToggleBtn.addEventListener('click', () => {
+        isMuted = !isMuted;
+        soundToggleBtn.textContent = isMuted ? '🔇' : '🔊';
+    });
+}
+
+const playComboBtn = document.getElementById('play-combo-btn');
+let selectedCards = [];
+
+if (playComboBtn) {
+    playComboBtn.addEventListener('click', () => {
+        if (currentRoomId && isMyTurn && selectedCards.length > 0) {
+            socket.emit('playCard', currentRoomId, selectedCards);
+            playCardSound();
+            selectedCards = [];
+            playComboBtn.classList.add('hidden');
+        }
+    });
+}
+
 const callUnoBtn = document.getElementById('call-uno-btn');
 if (callUnoBtn) {
     callUnoBtn.addEventListener('click', () => {
@@ -365,8 +436,61 @@ backToMenuBtn.addEventListener('click', () => {
     window.location.reload(); // Quick reset for simplicity
 });
 
+let weatherInterval = null;
+
+function applyThemeEffects(theme) {
+    // Clear old particles
+    document.querySelectorAll('.weather-particle').forEach(el => el.remove());
+    if (weatherInterval) clearInterval(weatherInterval);
+
+    if (theme === 'theme-ocean') {
+        // Bubbles
+        weatherInterval = setInterval(() => {
+            const bubble = document.createElement('div');
+            bubble.className = 'weather-particle';
+            bubble.textContent = '⚪'; // simple bubble
+            bubble.style.left = Math.random() * 100 + 'vw';
+            bubble.style.fontSize = (Math.random() * 10 + 10) + 'px';
+            bubble.style.opacity = '0.5';
+            bubble.style.animation = `floatBubble ${Math.random() * 3 + 3}s linear forwards`;
+            document.body.appendChild(bubble);
+            setTimeout(() => bubble.remove(), 6000);
+        }, 500);
+    } else if (theme === 'theme-forest') {
+        // Leaves
+        weatherInterval = setInterval(() => {
+            const leaf = document.createElement('div');
+            leaf.className = 'weather-particle';
+            leaf.textContent = '🍃';
+            leaf.style.left = Math.random() * 100 + 'vw';
+            leaf.style.fontSize = '20px';
+            leaf.style.animation = `fallSnow ${Math.random() * 4 + 4}s linear forwards`;
+            document.body.appendChild(leaf);
+            setTimeout(() => leaf.remove(), 8000);
+        }, 800);
+    } else if (theme === 'theme-dark' || theme === 'theme-classic') {
+        // Snow for classic or dark could be nice (or just empty)
+        // Let's do simple snow for classic
+        if (theme === 'theme-classic') {
+            weatherInterval = setInterval(() => {
+                const snow = document.createElement('div');
+                snow.className = 'weather-particle';
+                snow.textContent = '❄️';
+                snow.style.left = Math.random() * 100 + 'vw';
+                snow.style.fontSize = '12px';
+                snow.style.opacity = '0.6';
+                snow.style.animation = `fallSnow ${Math.random() * 3 + 3}s linear forwards`;
+                document.body.appendChild(snow);
+                setTimeout(() => snow.remove(), 6000);
+            }, 300);
+        }
+    }
+}
+
 themeSelector.addEventListener('change', (e) => {
-    document.body.className = e.target.value;
+    const theme = e.target.value;
+    document.body.className = theme;
+    applyThemeEffects(theme);
 });
 
 // Setup color picker logic
@@ -453,7 +577,13 @@ socket.on('loginSuccess', (data) => {
 
     displayUsername.textContent = myProfile.username;
     displayCoins.textContent = myProfile.coins;
+    displayLevel.textContent = myProfile.level || 1;
+    displayXp.textContent = myProfile.xp || 0;
+    displayTitle.textContent = myProfile.title || 'Novice';
     shopCoins.textContent = myProfile.coins;
+
+    renderQuests();
+    renderFriends();
 
     loginForm.classList.add('hidden');
     mainMenu.classList.remove('hidden');
@@ -468,9 +598,90 @@ socket.on('loginSuccess', (data) => {
 socket.on('profileUpdate', (profile) => {
     myProfile = { ...myProfile, ...profile };
     displayCoins.textContent = myProfile.coins;
+    displayLevel.textContent = myProfile.level || 1;
+    displayXp.textContent = myProfile.xp || 0;
+    displayTitle.textContent = myProfile.title || 'Novice';
     shopCoins.textContent = myProfile.coins;
+
+    renderQuests();
+    renderFriends();
     renderShop();
 });
+
+function renderFriends() {
+    if (!myProfile || !myProfile.friends) return;
+    friendsList.innerHTML = '';
+    myProfile.friends.forEach(f => {
+        const li = document.createElement('li');
+        li.style.display = 'flex';
+        li.style.justifyContent = 'space-between';
+        li.style.alignItems = 'center';
+        li.style.marginBottom = '5px';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = f;
+
+        const inviteBtn = document.createElement('button');
+        inviteBtn.textContent = 'Invite';
+        inviteBtn.style.padding = '2px 5px';
+        inviteBtn.style.fontSize = '12px';
+        inviteBtn.onclick = () => {
+            if (currentRoomId) {
+                socket.emit('inviteFriend', f, currentRoomId);
+                alert(`Invited ${f} to the room.`);
+            } else {
+                alert('You must be in a room to invite friends.');
+            }
+        };
+
+        li.appendChild(nameSpan);
+        li.appendChild(inviteBtn);
+        friendsList.appendChild(li);
+    });
+}
+
+if (addFriendBtn) {
+    addFriendBtn.addEventListener('click', () => {
+        const name = friendNameInput.value.trim();
+        if (name) {
+            socket.emit('addFriend', name);
+            friendNameInput.value = '';
+        }
+    });
+}
+
+socket.on('friendInvite', (data) => {
+    if (confirm(`${data.sender} invited you to play UNO! Join room?`)) {
+        const name = myProfile ? myProfile.username : 'Player';
+        isHost = false;
+        currentRoomId = data.roomId;
+        lobbyIdDisplay.textContent = `(ID: ${data.roomId})`;
+        socket.emit('joinRoom', data.roomId, name, '');
+    }
+});
+
+function renderQuests() {
+    if (!myProfile || !myProfile.quests) return;
+    questList.innerHTML = '';
+
+    const quests = [
+        { name: 'Play 5 +4 Cards', progress: myProfile.quests.play_plus4, goal: 5 },
+        { name: 'Call UNO 3 times', progress: myProfile.quests.call_uno, goal: 3 },
+        { name: 'Win 2 Games (0-7 Mode)', progress: myProfile.quests.win_07, goal: 2 }
+    ];
+
+    quests.forEach(q => {
+        const div = document.createElement('div');
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+
+        const isComplete = q.progress >= q.goal;
+        const color = isComplete ? '#2ecc71' : 'white';
+
+        div.innerHTML = `<span style="color: ${color}">${isComplete ? '✅' : '⏳'} ${q.name}</span> <span style="color: ${color}">${Math.min(q.progress, q.goal)}/${q.goal}</span>`;
+        questList.appendChild(div);
+    });
+}
 
 socket.on('shopError', (msg) => {
     alert(msg);
@@ -487,6 +698,12 @@ socket.on('leaderboardUpdate', (entries) => {
         const tdUsername = document.createElement('td');
         tdUsername.textContent = entry.username;
 
+        const tdLevel = document.createElement('td');
+        tdLevel.textContent = entry.level;
+
+        const tdTitle = document.createElement('td');
+        tdTitle.textContent = entry.title;
+
         const tdWins = document.createElement('td');
         tdWins.textContent = entry.wins;
 
@@ -502,6 +719,8 @@ socket.on('leaderboardUpdate', (entries) => {
 
         tr.appendChild(tdRank);
         tr.appendChild(tdUsername);
+        tr.appendChild(tdLevel);
+        tr.appendChild(tdTitle);
         tr.appendChild(tdWins);
         tr.appendChild(tdGamesPlayed);
         tr.appendChild(tdWinRate);
@@ -544,11 +763,18 @@ socket.on('hostTransferred', () => {
     alert("The previous host left. You are now the host!");
 });
 
+let currentRoomState = null;
+
 socket.on('gameState', (state) => {
+    currentRoomState = state;
     if (state.gameStarted) {
         lobbyScreen.classList.add('hidden');
         gameScreen.classList.remove('hidden');
     }
+
+    // Clear selections on new turn/state
+    selectedCards = [];
+    if (playComboBtn) playComboBtn.classList.add('hidden');
 
     renderOpponents(state.players);
     renderHand(state.hand);
@@ -616,6 +842,41 @@ socket.on('chatMessage', (data) => {
     // Shake effect for penalty cards
     if (data.sender === "System" && data.text.includes("draws")) {
         triggerShake();
+
+        // Find avatar and make it cry
+        const match = data.text.match(/^(.*?) draws/);
+        if (match) {
+            const victimName = match[1];
+            // Since we don't have direct mapping of names to DOM elements easily, we find by content
+            document.querySelectorAll('.opponent').forEach(opp => {
+                if (opp.textContent.includes(victimName)) {
+                    const avatar = opp.querySelector('.player-avatar');
+                    if (avatar) {
+                        const original = avatar.textContent;
+                        avatar.textContent = '😭';
+                        setTimeout(() => avatar.textContent = original, 2000);
+                    }
+                }
+            });
+        }
+    }
+
+    // Avatar Reaction for calling UNO
+    if (data.sender === "System" && data.text.includes("called UNO")) {
+        const match = data.text.match(/^(.*?) called/);
+        if (match) {
+            const callerName = match[1];
+            document.querySelectorAll('.opponent').forEach(opp => {
+                if (opp.textContent.includes(callerName)) {
+                    const avatar = opp.querySelector('.player-avatar');
+                    if (avatar) {
+                        const original = avatar.textContent;
+                        avatar.textContent = '😂';
+                        setTimeout(() => avatar.textContent = original, 2000);
+                    }
+                }
+            });
+        }
     }
 
     // Play sound if it's a quick chat message
@@ -661,7 +922,16 @@ socket.on('gameOver', (data) => {
 
     if (data.winnerName) {
         winnerMessage.textContent = `${data.winnerName} won the game!`;
-        triggerConfetti(); // Always trigger confetti for the winner globally
+
+        // Trigger specific victory animation based on winner's equipped skin
+        if (data.victorySkin === 'fireworks') {
+            triggerFireworks();
+        } else if (data.victorySkin === 'matrixRain') {
+            triggerMatrixRain();
+        } else {
+            triggerConfetti();
+        }
+
         if (data.winnerId === myId) {
             playVictorySound();
         }
@@ -683,10 +953,17 @@ socket.on('returnToLobby', () => {
 });
 
 // Render Functions
-function createCardElement(card, index = null) {
+function createCardElement(card, index = null, equippedCardBack = null) {
     const cardEl = document.createElement('div');
     cardEl.className = `card ${card.color || 'wild'}`;
     
+    // Apply legendary effects if the user has them equipped and we're drawing their hand
+    if (equippedCardBack === 'legendaryFire') {
+        cardEl.classList.add('legendary-fire');
+    } else if (equippedCardBack === 'legendaryMatrix') {
+        cardEl.classList.add('legendary-matrix');
+    }
+
     let displayValue = card.value;
     if (displayValue === 'wild') displayValue = 'WILD';
     if (displayValue === 'wild4') displayValue = '+4';
@@ -697,21 +974,42 @@ function createCardElement(card, index = null) {
     cardEl.textContent = displayValue;
 
     if (index !== null) {
-        cardEl.addEventListener('click', () => handleCardPlay(card, index));
+        cardEl.addEventListener('click', (e) => handleCardPlay(card, index, e.target));
     }
 
     return cardEl;
 }
 
-function handleCardPlay(card, index) {
+function handleCardPlay(card, index, cardEl) {
     if (!isMyTurn || !currentRoomId) return;
 
-    if (card.color === 'wild' || card.value === 'wild' || card.value === 'wild4') {
-        pendingWildCardIndex = index;
-        colorPicker.classList.remove('hidden');
+    if (currentRoomState && currentRoomState.combinationsMode) {
+        // Toggle selection
+        const selIdx = selectedCards.indexOf(index);
+        if (selIdx > -1) {
+            selectedCards.splice(selIdx, 1);
+            cardEl.style.transform = 'none';
+            cardEl.style.boxShadow = '2px 2px 5px rgba(0,0,0,0.5)';
+        } else {
+            selectedCards.push(index);
+            cardEl.style.transform = 'translateY(-15px)';
+            cardEl.style.boxShadow = '0 0 15px white';
+        }
+
+        if (selectedCards.length > 0) {
+            playComboBtn.classList.remove('hidden');
+            playComboBtn.textContent = `Play Selected (${selectedCards.length})`;
+        } else {
+            playComboBtn.classList.add('hidden');
+        }
     } else {
-        socket.emit('playCard', currentRoomId, index);
-        playCardSound();
+        if (card.color === 'wild' || card.value === 'wild' || card.value === 'wild4') {
+            pendingWildCardIndex = index;
+            colorPicker.classList.remove('hidden');
+        } else {
+            socket.emit('playCard', currentRoomId, index);
+            playCardSound();
+        }
     }
 }
 
@@ -721,8 +1019,11 @@ function renderHand(hand) {
     myHandDiv.innerHTML = '';
     const isDrawing = hand.length > previousHandSize;
 
+    // Check equipped card back for legendary effects
+    const equippedCardBack = myProfile ? myProfile.equippedCardBack : null;
+
     hand.forEach((card, index) => {
-        const cardEl = createCardElement(card, index);
+        const cardEl = createCardElement(card, index, equippedCardBack);
         // Only animate the newly drawn card (assuming it's at the end of the hand)
         if (isDrawing && index === hand.length - 1) {
             cardEl.classList.add('drawn');
@@ -787,7 +1088,8 @@ function renderShop() {
     const categories = {
         'avatar': 'Avatars',
         'chatColor': 'Chat Colors',
-        'cardBack': 'Card Backs'
+        'cardBack': 'Card Backs',
+        'victory': 'Victory Animations'
     };
 
     for (const [type, typeName] of Object.entries(categories)) {
@@ -814,7 +1116,9 @@ function renderShop() {
                 icon.style.borderRadius = '50%';
                 icon.textContent = '';
             } else if (item.type === 'cardBack') {
-                icon.textContent = '🃏';
+                icon.textContent = item.icon || '🃏';
+            } else if (item.type === 'victory') {
+                icon.textContent = item.icon || '🏆';
             }
 
             const title = document.createElement('h4');
@@ -822,14 +1126,17 @@ function renderShop() {
             title.textContent = item.name;
 
             const price = document.createElement('p');
-            price.textContent = item.price === 0 ? 'Free' : `${item.price} Coins`;
+            price.innerHTML = item.price === 0 ? 'Free' : `${item.price} Coins`;
+            if (item.minLevel) {
+                price.innerHTML += `<br><span style="font-size: 0.8em; color: ${myProfile.level >= item.minLevel ? '#2ecc71' : '#e74c3c'}">Requires Lvl ${item.minLevel}</span>`;
+            }
 
             div.appendChild(icon);
 
             const actionBtn = document.createElement('button');
 
             if (myProfile.skins.includes(id)) {
-                if (myProfile.equippedAvatar === id || myProfile.equippedChatColor === id || myProfile.equippedCardBack === id) {
+                if (myProfile.equippedAvatar === id || myProfile.equippedChatColor === id || myProfile.equippedCardBack === id || myProfile.equippedVictory === id) {
                     actionBtn.textContent = 'Equipped';
                     actionBtn.disabled = true;
                 } else {
@@ -839,7 +1146,7 @@ function renderShop() {
             } else {
                 actionBtn.textContent = 'Buy';
                 actionBtn.addEventListener('click', () => socket.emit('buySkin', id));
-                if (myProfile.coins < item.price) {
+                if (myProfile.coins < item.price || (item.minLevel && myProfile.level < item.minLevel)) {
                     actionBtn.disabled = true;
                 }
             }
