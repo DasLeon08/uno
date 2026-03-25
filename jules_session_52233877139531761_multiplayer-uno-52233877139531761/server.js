@@ -482,13 +482,18 @@ function nextTurn(room) {
 io.on('connection', (socket) => {
     console.log('A user connected:', socket.id);
 
-    socket.on('login', (username, password) => {
+
+    socket.on('authRequest', (username, password, action) => {
         if (!username || !password) return;
 
-        // Create user if not exists
-        if (!usersDb[username]) {
+        if (action === 'register') {
+            if (usersDb[username]) {
+                socket.emit('loginError', 'Benutzername existiert bereits. Bitte logge dich ein.');
+                return;
+            }
+            // Create user
             usersDb[username] = {
-                password: password, // In a real app, hash this!
+                password: password,
                 coins: 0,
                 wins: 0,
                 gamesPlayed: 0,
@@ -502,11 +507,22 @@ io.on('connection', (socket) => {
                 equippedAvatar: 'defaultAvatar',
                 equippedChatColor: 'defaultChatColor',
                 equippedCardBack: 'defaultCardBack',
-                equippedVictory: 'defaultVictory'
+                equippedVictory: 'defaultVictory',
+                lastLoginDate: new Date().toISOString().split('T')[0]
             };
             saveUsers();
-        } else {
-            // Migrate old profiles
+            finishLogin(socket, username);
+        } else if (action === 'login') {
+            if (!usersDb[username]) {
+                socket.emit('loginError', 'Benutzerkonto nicht gefunden. Bitte registriere dich zuerst.');
+                return;
+            }
+            if (usersDb[username].password !== password) {
+                socket.emit('loginError', 'Falsches Passwort.');
+                return;
+            }
+
+            // Migrate old profiles silently
             if (usersDb[username].gamesPlayed === undefined) usersDb[username].gamesPlayed = 0;
             if (usersDb[username].xp === undefined) usersDb[username].xp = 0;
             if (usersDb[username].level === undefined) usersDb[username].level = 1;
@@ -520,44 +536,37 @@ io.on('connection', (socket) => {
                      usersDb[username].equippedAvatar = usersDb[username].equippedSkin;
                      delete usersDb[username].equippedSkin;
                  }
-
                  let newSkins = usersDb[username].skins ? usersDb[username].skins.map(s => s === 'default' ? 'defaultAvatar' : s) : [];
                  if (usersDb[username].equippedAvatar === 'default') usersDb[username].equippedAvatar = 'defaultAvatar';
                  if (!usersDb[username].equippedAvatar) usersDb[username].equippedAvatar = 'defaultAvatar';
-
                  if (!newSkins.includes('defaultChatColor')) newSkins.push('defaultChatColor');
                  if (!newSkins.includes('defaultCardBack')) newSkins.push('defaultCardBack');
                  if (!newSkins.includes('defaultVictory')) newSkins.push('defaultVictory');
                  usersDb[username].skins = newSkins;
-
                  if (!usersDb[username].equippedChatColor) usersDb[username].equippedChatColor = 'defaultChatColor';
                  if (!usersDb[username].equippedCardBack) usersDb[username].equippedCardBack = 'defaultCardBack';
                  if (!usersDb[username].equippedVictory) usersDb[username].equippedVictory = 'defaultVictory';
                  saveUsers();
             }
 
-            // Check password
-            if (usersDb[username].password !== password) {
-                socket.emit('loginError', 'Incorrect password for this username.');
-                return;
-            }
+            finishLogin(socket, username);
         }
+    });
 
-        socket.username = username; // Attach to socket for easy access
+    function finishLogin(socket, username) {
+        socket.username = username;
         onlineUsers[username] = socket.id;
 
-        // Daily Login Bonus
         const today = new Date().toISOString().split('T')[0];
         let dailyBonusAwarded = false;
 
         if (usersDb[username].lastLoginDate !== today) {
             usersDb[username].lastLoginDate = today;
-            usersDb[username].coins += 20; // 20 coins daily bonus
+            usersDb[username].coins += 20;
             dailyBonusAwarded = true;
             saveUsers();
         }
 
-        // Don't send password to client
         const safeProfile = { ...usersDb[username] };
         delete safeProfile.password;
 
@@ -568,12 +577,20 @@ io.on('connection', (socket) => {
             dailyBonusAwarded: dailyBonusAwarded
         });
 
-        // Send leaderboard on login
         socket.emit('leaderboardUpdate', getLeaderboard());
-
-        // Send public rooms
         socket.emit('publicRooms', getPublicRooms());
+    }
+
+    // Keep old login event mapped to new authRequest for backwards compatibility if any old client still uses it
+    socket.on('login', (username, password) => {
+        // Assume old clients using 'login' meant to try logging in, or registering if missing
+        if (!usersDb[username]) {
+             socket.emit('authRequest', username, password, 'register'); // Forward to new logic
+        } else {
+             socket.emit('authRequest', username, password, 'login'); // Forward to new logic
+        }
     });
+
 
     socket.on('buySkin', (skinId) => {
         const username = socket.username;
@@ -912,9 +929,9 @@ io.on('connection', (socket) => {
              } else if (cardToPlay.value === 'reflector') {
                  io.to(roomId).emit('chatMessage', { sender: "System", text: `🛡️ ${player.name} played a Reflektor!` });
                  room.direction *= -1; // Reverse direction
-                 // Note: for 2 players, reversing direction doesn't change turn order effectively if we want the OTHER player to draw next.
-                 // Since we don't have a stacked penalty system natively, we just act as a standard reverse.
-                 if (playerIds.length === 2) nextTurn(room);
+                 // Note: for 2 players, reversing direction doesn't change turn order effectively.
+                 // Unlike a standard Reverse (which acts as a Skip in 1v1), a Reflector SHOULD pass the turn
+                 // back to the attacker so they suffer the penalty. So we DO NOT call nextTurn(room) here in 1v1.
              } else if (cardToPlay.value === 'roulette') {
                  io.to(roomId).emit('chatMessage', { sender: "System", text: `🎲 ${player.name} played Roulette!` });
                  const events = [

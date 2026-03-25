@@ -135,6 +135,8 @@ const gameOverScreen = document.getElementById('game-over-screen');
 
 const loginForm = document.getElementById('login-form');
 const loginBtn = document.getElementById('login-btn');
+const registerBtn = document.getElementById('register-btn');
+const loginErrorMsg = document.getElementById('login-error-msg');
 const mainMenu = document.getElementById('main-menu');
 const displayUsername = document.getElementById('display-username');
 const displayCoins = document.getElementById('display-coins');
@@ -259,19 +261,29 @@ quickChatBtns.forEach(btn => {
     });
 });
 
-loginBtn.addEventListener('click', () => {
+
+function handleAuthAction(actionType) {
     const name = playerNameInput.value.trim();
     const pass = playerPasswordInput.value;
-    if (name && pass) {
-        socket.emit('login', name, pass);
-    } else {
-        alert("Please enter both username and password.");
+
+    if (!name || !pass) {
+        loginErrorMsg.textContent = "Bitte fülle beide Felder aus!";
+        loginErrorMsg.classList.remove('hidden');
+        return;
     }
-});
+
+    loginErrorMsg.classList.add('hidden');
+    socket.emit('authRequest', name, pass, actionType);
+}
+
+loginBtn.addEventListener('click', () => handleAuthAction('login'));
+if(registerBtn) registerBtn.addEventListener('click', () => handleAuthAction('register'));
 
 socket.on('loginError', (msg) => {
-    alert(msg);
+    loginErrorMsg.textContent = msg;
+    loginErrorMsg.classList.remove('hidden');
 });
+
 
 shopBtn.addEventListener('click', () => {
     shopModal.classList.remove('hidden');
