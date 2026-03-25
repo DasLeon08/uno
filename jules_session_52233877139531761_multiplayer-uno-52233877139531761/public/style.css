@@ -621,3 +621,36 @@ li {
     50% { opacity: 0.8; }
     100% { transform: translateY(-10px) scale(1.5); opacity: 0; }
 }
+
+
+/* 3D Theme */
+body.theme-3d {
+    background-color: #000;
+    background-image: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+    perspective: 1000px;
+}
+body.theme-3d .center-board {
+    transform: rotateX(20deg) translateZ(50px);
+    transform-style: preserve-3d;
+}
+body.theme-3d .card {
+    box-shadow: 0 10px 20px rgba(0,0,0,0.8), inset 0 0 10px rgba(255,255,255,0.2);
+}
+body.theme-3d .deck-card {
+    transform: translateZ(10px);
+}
+body.theme-3d .opponent {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    transform: rotateX(-10deg);
+}
+body.theme-3d button {
+    background-color: #34495e;
+    box-shadow: 0 4px 0 #2c3e50;
+}
+body.theme-3d button:hover {
+    background-color: #415b76;
+}
+
+.card.special { background: linear-gradient(135deg, #9b59b6, #8e44ad); color: white; text-shadow: 1px 1px 3px black; border-color: #f1c40f; }

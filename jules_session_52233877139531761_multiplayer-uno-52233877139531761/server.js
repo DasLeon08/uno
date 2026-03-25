@@ -45,11 +45,15 @@ const SKINS = {
     'unicorn': { name: 'Unicorn', icon: '🦄', price: 500, type: 'avatar' },
     'dragon': { name: 'Dragon', icon: '🐉', price: 500, type: 'avatar' },
     'alien': { name: 'Alien', icon: '👽', price: 1000, type: 'avatar' },
+    'robot': { name: 'Robot', icon: '🤖', price: 0, type: 'avatar', minLevel: 5 },
+    'ninja': { name: 'Ninja', icon: '🥷', price: 0, type: 'avatar', minLevel: 15 },
+    'king': { name: 'King', icon: '👑', price: 0, type: 'avatar', minLevel: 30 },
 
     'defaultChatColor': { name: 'Default Black', color: '#333333', price: 0, type: 'chatColor' },
     'redChat': { name: 'Red Text', color: '#e74c3c', price: 150, type: 'chatColor' },
     'blueChat': { name: 'Blue Text', color: '#3498db', price: 150, type: 'chatColor' },
     'goldChat': { name: 'Gold Text', color: '#f1c40f', price: 500, type: 'chatColor' },
+    'rainbowChat': { name: 'Rainbow Text', color: 'linear-gradient(to right, red, orange, yellow, green, blue, indigo, violet)', price: 0, type: 'chatColor', minLevel: 10 },
 
     'defaultCardBack': { name: 'Default Red', icon: '🃏', price: 0, type: 'cardBack' },
     'blackCardBack': { name: 'Dark Mode Cards', icon: '🃏', price: 300, type: 'cardBack' },
@@ -59,7 +63,8 @@ const SKINS = {
 
     'defaultVictory': { name: 'Confetti', icon: '🎉', price: 0, type: 'victory' },
     'fireworks': { name: 'Fireworks', icon: '🎆', price: 1000, type: 'victory' },
-    'matrixRain': { name: 'Matrix Rain', icon: '🌧️', price: 1500, type: 'victory' }
+    'matrixRain': { name: 'Matrix Rain', icon: '🌧️', price: 1500, type: 'victory' },
+    'lightning': { name: 'Lightning Strike', icon: '⚡', price: 0, type: 'victory', minLevel: 20 }
 };
 
 let colors = ['red', 'blue', 'green', 'yellow'];
@@ -81,6 +86,7 @@ function createRoomState(roomId, data, hostId) {
         wildRouletteMode: data.wildRouletteMode || false,
         teamMode: data.teamMode || false,
         combinationsMode: data.combinationsMode || false,
+        specialCardsMode: data.specialCardsMode || false,
         hostId: hostId,
         players: {},
         deck: [],
@@ -223,10 +229,22 @@ function createDeck(room) {
             room.deck.push({ color, value });
         }
     }
+
     for (let i = 0; i < 4; i++) {
         room.deck.push({ color: 'wild', value: 'wild' });
         room.deck.push({ color: 'wild', value: 'wild4' });
     }
+
+    if (room.specialCardsMode) {
+        for (let i = 0; i < 4; i++) {
+            room.deck.push({ color: 'special', value: 'reflector' });
+            room.deck.push({ color: 'special', value: 'roulette' });
+        }
+        for (let i = 0; i < 2; i++) {
+            room.deck.push({ color: 'special', value: 'equalize' });
+        }
+    }
+
 }
 
 function shuffleDeck(room) {
@@ -283,7 +301,8 @@ function broadcastGameState(roomId) {
                 gameStarted: room.gameStarted,
                 activePenalty: room.activePenalty,
                 penaltyType: room.penaltyType,
-                hasDrawn: room.players[id].hasDrawn
+                hasDrawn: room.players[id].hasDrawn,
+                spectatorCount: room.spectators ? room.spectators.length : 0
             });
         }
     }
@@ -302,6 +321,7 @@ function broadcastGameState(roomId) {
                 activePenalty: room.activePenalty,
                 penaltyType: room.penaltyType,
                 hasDrawn: false,
+                spectatorCount: room.spectators ? room.spectators.length : 0,
                 isSpectator: true
             });
         });
@@ -326,29 +346,32 @@ function playBotTurn(room) {
 
         // Find valid cards
         bot.hand.forEach((card, index) => {
-            let isValid = card.color === 'wild' ||
+
+            let isValid = card.color === 'wild' || card.color === 'special' ||
                           card.color === room.activeColor ||
                           card.value === topCard.value;
+
             if (isValid) validCards.push({ card, index });
         });
 
         if (validCards.length > 0) {
             // Select card based on difficulty
             let cardToPlay;
+            // Prevent immediate identical card match (unless it's the only option)
+            let preferredCards = validCards.filter(c => !(c.card.color === topCard.color && c.card.value === topCard.value && c.card.color !== 'wild'));
+            let cardsPool = preferredCards.length > 0 ? preferredCards : validCards;
+
             if (bot.difficulty === 'easy') {
-                // Easy: Play first valid card
-                cardToPlay = validCards[0];
+                cardToPlay = cardsPool[0];
             } else if (bot.difficulty === 'hard') {
-                // Hard: Try to play action cards or keep wilds
-                const nonWilds = validCards.filter(c => c.card.color !== 'wild');
+                const nonWilds = cardsPool.filter(c => c.card.color !== 'wild');
                 if (nonWilds.length > 0) {
                     cardToPlay = nonWilds[Math.floor(Math.random() * nonWilds.length)];
                 } else {
-                    cardToPlay = validCards[0];
+                    cardToPlay = cardsPool[0];
                 }
             } else {
-                // Medium: random valid card
-                cardToPlay = validCards[Math.floor(Math.random() * validCards.length)];
+                cardToPlay = cardsPool[Math.floor(Math.random() * cardsPool.length)];
             }
 
             // Play the card
@@ -435,7 +458,7 @@ function playBotTurn(room) {
              broadcastGameState(room.id);
         }
 
-    }, 1500); // Thinking delay
+    }, Math.floor(Math.random() * 1500) + 1500); // Randomized Thinking delay
 }
 
 function nextTurn(room) {
@@ -785,15 +808,29 @@ io.on('connection', (socket) => {
                 isValid = cardToPlay.color === 'wild' ||
                           cardToPlay.color === room.activeColor ||
                           cardToPlay.value === topCard.value;
+
             } else if (room.jumpInMode) {
                 // Jump-in validation
-                if (cardToPlay.color === topCard.color && cardToPlay.value === topCard.value && cardToPlay.color !== 'wild') {
+                if (cardToPlay.color === topCard.color && cardToPlay.value === topCard.value && cardToPlay.color !== 'wild' && cardToPlay.color !== 'special') {
                     isValid = true;
                     // Shift turn to the jumping player
                     room.currentPlayerIndex = playerIds.indexOf(socket.id);
                     io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} jumped in!` });
                 }
             }
+
+            // Special Cards Validation
+            if (isCurrentTurn && cardToPlay.color === 'special') {
+                if (cardToPlay.value === 'reflector') {
+                     // Reflektor can be played anytime, acts as a wild for matching but has unique effects
+                     isValid = true;
+                } else if (cardToPlay.value === 'roulette') {
+                     isValid = true;
+                } else if (cardToPlay.value === 'equalize') {
+                     isValid = true;
+                }
+            }
+
         }
 
         if (!isValid) return;
@@ -814,9 +851,16 @@ io.on('connection', (socket) => {
              let cardToPlay = cardsToPlay[i];
              lastPlayedCard = cardToPlay;
 
-             if (cardToPlay.color === 'wild') {
+
+             if (cardToPlay.color === 'wild' || cardToPlay.color === 'special') {
                 // Only honor selected color if it's the only/last card, else default to red in a combo
-                room.activeColor = selectedColor || 'red';
+                if (cardToPlay.color === 'special') {
+                    // special cards don't change the active color to 'special', they keep the previous color or default to red if played first
+                    room.activeColor = selectedColor || room.activeColor || 'red';
+                } else {
+                    room.activeColor = selectedColor || 'red';
+                }
+
 
                 if (room.wildRouletteMode) {
                     const events = [
@@ -864,6 +908,72 @@ io.on('connection', (socket) => {
                      }
                      saveUsers();
                  }
+
+             } else if (cardToPlay.value === 'reflector') {
+                 io.to(roomId).emit('chatMessage', { sender: "System", text: `🛡️ ${player.name} played a Reflektor!` });
+                 room.direction *= -1; // Reverse direction
+                 // Note: for 2 players, reversing direction doesn't change turn order effectively if we want the OTHER player to draw next.
+                 // Since we don't have a stacked penalty system natively, we just act as a standard reverse.
+                 if (playerIds.length === 2) nextTurn(room);
+             } else if (cardToPlay.value === 'roulette') {
+                 io.to(roomId).emit('chatMessage', { sender: "System", text: `🎲 ${player.name} played Roulette!` });
+                 const events = [
+                     () => {
+                         io.to(roomId).emit('chatMessage', { sender: "System", text: "Roulette Event: Everyone draws 2 cards!" });
+                         playerIds.forEach(pid => {
+                             for(let n=0;n<2;n++){
+                                 if (room.deck.length === 0) { room.deck = room.discardPile.splice(0, room.discardPile.length - 1); shuffleDeck(room); }
+                                 if (room.deck.length > 0) room.players[pid].hand.push(room.deck.pop());
+                             }
+                         });
+                     },
+                     () => {
+                         io.to(roomId).emit('chatMessage', { sender: "System", text: "Roulette Event: All colors become RED!" });
+                         room.activeColor = 'red';
+                     },
+                     () => {
+                         io.to(roomId).emit('chatMessage', { sender: "System", text: "Roulette Event: Player with fewest cards draws 3!" });
+                         let minCards = 999;
+                         let targetId = null;
+                         playerIds.forEach(pid => {
+                             if(room.players[pid].hand.length < minCards) { minCards = room.players[pid].hand.length; targetId = pid; }
+                         });
+                         if (targetId) {
+                             io.to(roomId).emit('chatMessage', { sender: "System", text: `${room.players[targetId].name} draws 3!` });
+                             for(let n=0;n<3;n++){
+                                 if (room.deck.length === 0) { room.deck = room.discardPile.splice(0, room.discardPile.length - 1); shuffleDeck(room); }
+                                 if (room.deck.length > 0) room.players[targetId].hand.push(room.deck.pop());
+                             }
+                         }
+                     }
+                 ];
+                 events[Math.floor(Math.random() * events.length)]();
+             } else if (cardToPlay.value === 'equalize') {
+                 // Find opponent with fewest cards
+                 let minCards = 999;
+                 let targetId = null;
+                 playerIds.forEach(pid => {
+                     if(pid !== socket.id && room.players[pid].hand.length < minCards) {
+                         minCards = room.players[pid].hand.length;
+                         targetId = pid;
+                     }
+                 });
+                 if (targetId) {
+                     const targetPlayer = room.players[targetId];
+                     io.to(roomId).emit('chatMessage', { sender: "System", text: `⚖️ ${player.name} Equalized with ${targetPlayer.name}!` });
+
+                     // Combine, shuffle, split
+                     let combinedHand = player.hand.concat(targetPlayer.hand);
+                     for (let j = combinedHand.length - 1; j > 0; j--) {
+                         const k = Math.floor(Math.random() * (j + 1));
+                         [combinedHand[j], combinedHand[k]] = [combinedHand[k], combinedHand[j]];
+                     }
+
+                     let half = Math.ceil(combinedHand.length / 2);
+                     player.hand = combinedHand.slice(0, half);
+                     targetPlayer.hand = combinedHand.slice(half);
+                 }
+
              } else if (room.zeroSevenMode && cardToPlay.value === '0') {
                  io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 0. All hands are rotated!` });
                  let hands = playerIds.map(id => room.players[id].hand);
@@ -904,16 +1014,23 @@ io.on('connection', (socket) => {
             }
         }
 
-        // UNO logic: Check if player forgot to call UNO
+        // UNO logic: Give a 3-second grace period to call UNO
         if (player.hand.length === 1 && !player.calledUno) {
-            io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} forgot to call UNO and draws 2 cards!` });
-            for(let i=0; i<2; i++){
-                if (room.deck.length === 0) {
-                    room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                    shuffleDeck(room);
+            player.unoPenaltyPending = true;
+            player.unoTimeout = setTimeout(() => {
+                if (room && room.players[socket.id] && player.unoPenaltyPending && !player.calledUno) {
+                    io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} forgot to call UNO in time and draws 2 cards!` });
+                    for(let i=0; i<2; i++){
+                        if (room.deck.length === 0) {
+                            room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                            shuffleDeck(room);
+                        }
+                        if (room.deck.length > 0) player.hand.push(room.deck.pop());
+                    }
+                    player.unoPenaltyPending = false;
+                    broadcastGameState(roomId);
                 }
-                if (room.deck.length > 0) player.hand.push(room.deck.pop());
-            }
+            }, 3000);
         }
 
         // Check win conditions for all players after potential hand swaps
@@ -1007,6 +1124,13 @@ io.on('connection', (socket) => {
 
         if (player.hand.length === 1 || player.hand.length === 2) {
             player.calledUno = true;
+
+            // Clear pending penalty if called in time
+            if (player.unoPenaltyPending) {
+                player.unoPenaltyPending = false;
+                if (player.unoTimeout) clearTimeout(player.unoTimeout);
+            }
+
             io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} called UNO!` });
 
             if (!player.isBot && usersDb[player.name]) {
@@ -1037,6 +1161,31 @@ io.on('connection', (socket) => {
         const username = socket.username || 'Player';
         // Broadcast emote so it shows over the player's avatar
         io.to(roomId).emit('playerEmote', { playerId: socket.id, emote: emote });
+    });
+
+
+    socket.on('sortHand', (roomId, method) => {
+        const room = rooms[roomId];
+        if (!room || !room.gameStarted || !room.players[socket.id]) return;
+
+        const player = room.players[socket.id];
+
+        const colorOrder = { 'red': 1, 'blue': 2, 'green': 3, 'yellow': 4, 'wild': 5, 'special': 6 };
+        const valueOrder = { '0':0, '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, 'skip':10, 'reverse':11, 'draw2':12, 'wild':13, 'wild4':14, 'reflector':15, 'roulette':16, 'equalize':17 };
+
+        if (method === 'color') {
+            player.hand.sort((a, b) => {
+                if (colorOrder[a.color] !== colorOrder[b.color]) return colorOrder[a.color] - colorOrder[b.color];
+                return valueOrder[a.value] - valueOrder[b.value];
+            });
+        } else if (method === 'number') {
+            player.hand.sort((a, b) => {
+                if (valueOrder[a.value] !== valueOrder[b.value]) return valueOrder[a.value] - valueOrder[b.value];
+                return colorOrder[a.color] - colorOrder[b.color];
+            });
+        }
+
+        broadcastGameState(roomId);
     });
 
     socket.on('playAgain', (roomId) => {

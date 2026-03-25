@@ -150,9 +150,26 @@ const playerPasswordInput = document.getElementById('player-password');
 
 const singleplayerBtn = document.getElementById('singleplayer-btn');
 const multiplayerBtn = document.getElementById('multiplayer-btn');
+const profileBtn = document.getElementById('profile-btn');
 const shopBtn = document.getElementById('shop-btn');
 const leaderboardBtn = document.getElementById('leaderboard-btn');
 const logoutBtn = document.getElementById('logout-btn');
+
+const profileModal = document.getElementById('profile-modal');
+const closeProfileBtn = document.getElementById('close-profile-btn');
+const battlePassContainer = document.getElementById('battle-pass-container');
+
+if (profileBtn) {
+    profileBtn.addEventListener('click', () => {
+        profileModal.classList.remove('hidden');
+        renderBattlePass();
+    });
+}
+if (closeProfileBtn) {
+    closeProfileBtn.addEventListener('click', () => {
+        profileModal.classList.add('hidden');
+    });
+}
 
 const shopModal = document.getElementById('shop-modal');
 const shopCoins = document.getElementById('shop-coins');
@@ -338,6 +355,7 @@ createRoomConfirmBtn.addEventListener('click', () => {
     const wildRouletteMode = document.getElementById('room-wildroulette-checkbox').checked;
     const teamMode = document.getElementById('room-team-checkbox').checked;
     const combinationsMode = document.getElementById('room-combinations-checkbox').checked;
+    const specialCardsMode = document.getElementById('room-special-checkbox').checked;
     const name = playerNameInput.value.trim() || 'Player';
 
     isHost = true;
@@ -355,6 +373,7 @@ createRoomConfirmBtn.addEventListener('click', () => {
         wildRouletteMode,
         teamMode,
         combinationsMode,
+        specialCardsMode,
         playerName: name
     });
     createRoomModal.classList.add('hidden');
@@ -380,6 +399,21 @@ deckDiv.addEventListener('click', () => {
         playDrawSound();
     }
 });
+
+
+const sortColorBtn = document.getElementById('sort-color-btn');
+const sortNumberBtn = document.getElementById('sort-number-btn');
+
+if (sortColorBtn) {
+    sortColorBtn.addEventListener('click', () => {
+        if (currentRoomId) socket.emit('sortHand', currentRoomId, 'color');
+    });
+}
+if (sortNumberBtn) {
+    sortNumberBtn.addEventListener('click', () => {
+        if (currentRoomId) socket.emit('sortHand', currentRoomId, 'number');
+    });
+}
 
 const passTurnBtn = document.getElementById('pass-turn-btn');
 if (passTurnBtn) {
@@ -443,7 +477,20 @@ function applyThemeEffects(theme) {
     document.querySelectorAll('.weather-particle').forEach(el => el.remove());
     if (weatherInterval) clearInterval(weatherInterval);
 
-    if (theme === 'theme-ocean') {
+    if (theme === 'theme-3d') {
+        // Stars
+        weatherInterval = setInterval(() => {
+            const star = document.createElement('div');
+            star.className = 'weather-particle';
+            star.textContent = '✨';
+            star.style.left = Math.random() * 100 + 'vw';
+            star.style.fontSize = (Math.random() * 5 + 10) + 'px';
+            star.style.opacity = '0.8';
+            star.style.animation = `fallSnow ${Math.random() * 5 + 5}s linear forwards`;
+            document.body.appendChild(star);
+            setTimeout(() => star.remove(), 10000);
+        }, 400);
+    } else if (theme === 'theme-ocean') {
         // Bubbles
         weatherInterval = setInterval(() => {
             const bubble = document.createElement('div');
@@ -580,6 +627,8 @@ socket.on('loginSuccess', (data) => {
     displayLevel.textContent = myProfile.level || 1;
     displayXp.textContent = myProfile.xp || 0;
     displayTitle.textContent = myProfile.title || 'Novice';
+    const xpProgress = myProfile.xp % 100;
+    document.getElementById('xp-bar-fill').style.width = xpProgress + '%';
     shopCoins.textContent = myProfile.coins;
 
     renderQuests();
@@ -779,6 +828,15 @@ socket.on('gameState', (state) => {
     renderOpponents(state.players);
     renderHand(state.hand);
     renderDiscardPile(state.topCard, state.activeColor);
+
+    const specDisplay = document.getElementById("spectators-display");
+    const specCount = document.getElementById("spectator-count");
+    if (state.spectatorCount > 0) {
+        specDisplay.classList.remove("hidden");
+        specCount.textContent = state.spectatorCount;
+    } else {
+        specDisplay.classList.add("hidden");
+    }
     
     // Check if it's my turn
     const me = state.players.find(p => p.id === myId);
@@ -967,6 +1025,9 @@ function createCardElement(card, index = null, equippedCardBack = null) {
     let displayValue = card.value;
     if (displayValue === 'wild') displayValue = 'WILD';
     if (displayValue === 'wild4') displayValue = '+4';
+    if (displayValue === 'reflector') displayValue = '🛡️';
+    if (displayValue === 'roulette') displayValue = '🎲';
+    if (displayValue === 'equalize') displayValue = '⚖️';
     if (displayValue === 'draw2') displayValue = '+2';
     if (displayValue === 'skip') displayValue = 'SKIP';
     if (displayValue === 'reverse') displayValue = 'REV';
@@ -1003,10 +1064,12 @@ function handleCardPlay(card, index, cardEl) {
             playComboBtn.classList.add('hidden');
         }
     } else {
-        if (card.color === 'wild' || card.value === 'wild' || card.value === 'wild4') {
+
+        if (card.color === 'wild' || card.value === 'wild' || card.value === 'wild4' || card.color === 'special') {
             pendingWildCardIndex = index;
             colorPicker.classList.remove('hidden');
         } else {
+
             socket.emit('playCard', currentRoomId, index);
             playCardSound();
         }
@@ -1157,4 +1220,48 @@ function renderShop() {
             shopItemsContainer.appendChild(div);
         }
     }
+}
+
+function renderBattlePass() {
+    if (!shopData || !myProfile) return;
+    battlePassContainer.innerHTML = '<h3 style="color: #f1c40f; text-align: center;">Level Rewards</h3>';
+
+    // Sort items by minLevel
+    let passItems = Object.entries(shopData)
+        .filter(([id, item]) => item.minLevel)
+        .sort((a, b) => a[1].minLevel - b[1].minLevel);
+
+    if (passItems.length === 0) {
+        battlePassContainer.innerHTML += '<p style="color: white; text-align: center;">More rewards coming soon!</p>';
+        return;
+    }
+
+    passItems.forEach(([id, item]) => {
+        const div = document.createElement('div');
+        div.style.background = myProfile.level >= item.minLevel ? 'rgba(46, 204, 113, 0.2)' : 'rgba(255,255,255,0.1)';
+        div.style.border = '1px solid ' + (myProfile.level >= item.minLevel ? '#2ecc71' : '#555');
+        div.style.padding = '10px';
+        div.style.margin = '10px 0';
+        div.style.borderRadius = '8px';
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.alignItems = 'center';
+
+        const info = document.createElement('div');
+        info.innerHTML = `<strong style="color: white;">Level ${item.minLevel}</strong><br><span style="color: #ccc;">Unlock: ${item.name} (${item.type})</span>`;
+
+        const status = document.createElement('span');
+        status.style.fontWeight = 'bold';
+        if (myProfile.level >= item.minLevel) {
+            status.textContent = '✅ Unlocked';
+            status.style.color = '#2ecc71';
+        } else {
+            status.textContent = '🔒 Locked';
+            status.style.color = '#e74c3c';
+        }
+
+        div.appendChild(info);
+        div.appendChild(status);
+        battlePassContainer.appendChild(div);
+    });
 }
