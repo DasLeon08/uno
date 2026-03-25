@@ -578,10 +578,10 @@ socket.on('loginSuccess', (data) => {
     displayUsername.textContent = myProfile.username;
     displayCoins.textContent = myProfile.coins;
     displayLevel.textContent = myProfile.level || 1;
-    displayXp.textContent = myProfile.xp || 0;
     displayTitle.textContent = myProfile.title || 'Novice';
     shopCoins.textContent = myProfile.coins;
 
+    updateXPBar();
     renderQuests();
     renderFriends();
 
