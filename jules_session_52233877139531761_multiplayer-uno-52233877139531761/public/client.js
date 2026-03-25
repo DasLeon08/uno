@@ -293,6 +293,7 @@ createRoomConfirmBtn.addEventListener('click', () => {
     const speedMode = document.getElementById('room-speed-checkbox').checked;
     const noMercyMode = document.getElementById('room-nomercy-checkbox').checked;
     const rankedMode = document.getElementById('room-ranked-checkbox').checked;
+    const zeroSevenMode = document.getElementById('room-zero-seven-checkbox').checked;
     const name = playerNameInput.value.trim() || 'Player';
 
     isHost = true;
@@ -304,6 +305,7 @@ createRoomConfirmBtn.addEventListener('click', () => {
         speedMode,
         noMercyMode,
         rankedMode,
+        zeroSevenMode,
         playerName: name
     });
     createRoomModal.classList.add('hidden');
@@ -597,6 +599,12 @@ socket.on('chatMessage', (data) => {
     const p = document.createElement('p');
     const senderStrong = document.createElement('strong');
     senderStrong.textContent = `${data.sender}: `;
+
+    // Apply chat color if provided
+    if (data.color) {
+        senderStrong.style.color = data.color;
+    }
+
     const textNode = document.createTextNode(data.text);
 
     p.appendChild(senderStrong);
