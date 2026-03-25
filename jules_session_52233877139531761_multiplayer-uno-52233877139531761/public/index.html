@@ -65,6 +65,8 @@
                         <th>Rank</th>
                         <th>Player</th>
                         <th>Wins</th>
+                        <th>Games Played</th>
+                        <th>Win Rate</th>
                         <th>Coins</th>
                     </tr>
                 </thead>
@@ -93,7 +95,13 @@
             <input type="text" id="room-name-input" placeholder="Room Name" style="margin-bottom: 10px; width: 80%;"/><br>
             <input type="password" id="room-password-input" placeholder="Room Password (Optional)" style="margin-bottom: 10px; width: 80%; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #ccc; outline: none;"/><br>
             <label style="color: white;">Max Players: <input type="number" id="room-max-players" value="4" min="2" max="10" style="width: 50px;"/></label><br><br>
-            <label style="color: white;"><input type="checkbox" id="room-private-checkbox" /> Unlisted Room (Won't show in browser)</label><br><br>
+
+            <h4 style="color: white; margin-bottom: 5px; margin-top: 10px;">Options</h4>
+            <label style="color: white;"><input type="checkbox" id="room-private-checkbox" /> Unlisted Room</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-speed-checkbox" /> Speed Mode (15s Turns)</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-nomercy-checkbox" /> No Mercy Mode (Stacking Penalties)</label><br>
+            <label style="color: white;"><input type="checkbox" id="room-ranked-checkbox" /> Ranked Mode (Affects MMR)</label><br><br>
+
             <button id="create-room-confirm-btn">Create</button>
             <button id="create-room-cancel-btn">Cancel</button>
         </div>
@@ -127,6 +135,9 @@
         </div>
         <div class="player-area">
             <h3 id="my-name">My Hand</h3>
+            <div id="timer-container" class="hidden" style="width: 100%; max-width: 400px; height: 10px; background-color: #333; border-radius: 5px; margin: 5px auto; overflow: hidden;">
+                <div id="timer-bar" style="height: 100%; width: 100%; background-color: #2ecc71; transition: width 1s linear;"></div>
+            </div>
             <div id="my-hand" class="hand"></div>
         </div>
         
@@ -162,6 +173,12 @@
                 <button class="emoji-btn">😡</button>
                 <button class="emoji-btn">😭</button>
                 <button class="emoji-btn">🔥</button>
+            </div>
+            <div class="quick-chat-bar" style="display: flex; gap: 5px; margin-bottom: 5px; overflow-x: auto; padding-bottom: 5px;">
+                <button class="quick-chat-btn" style="white-space: nowrap; padding: 2px 5px; font-size: 0.8em; border-radius: 10px;">Good Game!</button>
+                <button class="quick-chat-btn" style="white-space: nowrap; padding: 2px 5px; font-size: 0.8em; border-radius: 10px;">Draw 4!</button>
+                <button class="quick-chat-btn" style="white-space: nowrap; padding: 2px 5px; font-size: 0.8em; border-radius: 10px;">Oh no...</button>
+                <button class="quick-chat-btn" style="white-space: nowrap; padding: 2px 5px; font-size: 0.8em; border-radius: 10px;">Well played!</button>
             </div>
             <div class="chat-input-row">
                 <input type="text" id="chat-input" placeholder="Type a message..." />
