@@ -56,5 +56,469 @@
     "equippedCardBack": "defaultCardBack",
     "equippedVictory": "defaultVictory",
     "lastLoginDate": "2026-03-25"
+  },
+  "TestUser2": {
+    "password": "password123",
+    "coins": 20,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "TestUser_Register": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "Player1": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_CPBkNCNv": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_ibCfxNyf": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P2_XfGv2QFP": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_WvpRPkKc": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P2_Fh6bDKoI": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_wNbF5SrZ": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P2_O3QYifCl": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_Vox96DjP": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P2_PHjx8S7O": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_NRUagHYw": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P2_N7TNvwfD": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P1_cmXowMMe": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
+  },
+  "P2_3JxdAJiW": {
+    "password": "pass123",
+    "coins": 0,
+    "wins": 0,
+    "gamesPlayed": 0,
+    "xp": 0,
+    "level": 1,
+    "title": "Novice",
+    "unlockedTitles": [
+      "Novice"
+    ],
+    "quests": {
+      "play_plus4": 0,
+      "call_uno": 0,
+      "win_07": 0
+    },
+    "friends": [],
+    "skins": [
+      "defaultAvatar",
+      "defaultChatColor",
+      "defaultCardBack",
+      "defaultVictory"
+    ],
+    "equippedAvatar": "defaultAvatar",
+    "equippedChatColor": "defaultChatColor",
+    "equippedCardBack": "defaultCardBack",
+    "equippedVictory": "defaultVictory",
+    "lastLoginDate": "2026-03-25"
   }
 }

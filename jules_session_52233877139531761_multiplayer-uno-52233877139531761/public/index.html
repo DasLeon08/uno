@@ -13,7 +13,11 @@
         <div id="login-form">
             <input type="text" id="player-name" placeholder="Enter your username" style="margin-bottom: 10px;" /><br>
             <input type="password" id="player-password" placeholder="Enter your password" style="margin-bottom: 10px; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid #ccc; outline: none;" /><br>
-            <button id="login-btn" style="margin-top: 10px;">Login / Register</button>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+                <button id="login-btn">Anmelden</button>
+                <button id="register-btn" style="background-color: #2ecc71;">Registrieren</button>
+            </div>
+            <p id="login-error-msg" style="color: #e74c3c; font-weight: bold; margin-top: 10px;" class="hidden"></p>
         </div>
 
         <div id="main-menu" class="hidden">
