@@ -280,8 +280,9 @@ loginBtn.addEventListener('click', () => handleAuthAction('login'));
 if(registerBtn) registerBtn.addEventListener('click', () => handleAuthAction('register'));
 
 socket.on('loginError', (msg) => {
-    loginErrorMsg.textContent = msg;
+    loginErrorMsg.innerHTML = '⚠️ ' + msg;
     loginErrorMsg.classList.remove('hidden');
+    // Add a little shake animation class if we wanted, but simple inline is fine.
 });
 
 
