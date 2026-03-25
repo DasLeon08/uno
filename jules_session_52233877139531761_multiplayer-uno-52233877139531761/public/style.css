@@ -86,6 +86,42 @@ body.theme-neon button {
     box-shadow: 0 0 5px #00ffff;
 }
 
+body.theme-ocean {
+    background-color: #006994;
+    background-image: linear-gradient(180deg, #006994 0%, #00264d 100%);
+}
+body.theme-ocean button {
+    background-color: #0088cc;
+    box-shadow: 0 4px 0 #005580;
+}
+body.theme-ocean button:hover {
+    background-color: #00aaff;
+}
+
+body.theme-forest {
+    background-color: #2e8b57;
+    background-image: linear-gradient(180deg, #2e8b57 0%, #004d00 100%);
+}
+body.theme-forest button {
+    background-color: #3cb371;
+    box-shadow: 0 4px 0 #228b22;
+}
+body.theme-forest button:hover {
+    background-color: #48d1cc;
+}
+
+body.theme-sunset {
+    background-color: #ff7e5f;
+    background-image: linear-gradient(180deg, #ff7e5f 0%, #feb47b 100%);
+}
+body.theme-sunset button {
+    background-color: #ff4500;
+    box-shadow: 0 4px 0 #cc3700;
+}
+body.theme-sunset button:hover {
+    background-color: #ff6347;
+}
+
 .screen {
     text-align: center;
     width: 100%;

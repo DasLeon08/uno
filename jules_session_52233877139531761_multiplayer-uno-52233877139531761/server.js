@@ -36,20 +36,29 @@ function saveUsers() {
 }
 
 const SKINS = {
-    'default': { name: 'Default', icon: '👤', price: 0 },
-    'dog': { name: 'Dog', icon: '🐶', price: 100 },
-    'cat': { name: 'Cat', icon: '🐱', price: 100 },
-    'fox': { name: 'Fox', icon: '🦊', price: 200 },
-    'panda': { name: 'Panda', icon: '🐼', price: 200 },
-    'unicorn': { name: 'Unicorn', icon: '🦄', price: 500 },
-    'dragon': { name: 'Dragon', icon: '🐉', price: 500 },
-    'alien': { name: 'Alien', icon: '👽', price: 1000 }
+    'defaultAvatar': { name: 'Default', icon: '👤', price: 0, type: 'avatar' },
+    'dog': { name: 'Dog', icon: '🐶', price: 100, type: 'avatar' },
+    'cat': { name: 'Cat', icon: '🐱', price: 100, type: 'avatar' },
+    'fox': { name: 'Fox', icon: '🦊', price: 200, type: 'avatar' },
+    'panda': { name: 'Panda', icon: '🐼', price: 200, type: 'avatar' },
+    'unicorn': { name: 'Unicorn', icon: '🦄', price: 500, type: 'avatar' },
+    'dragon': { name: 'Dragon', icon: '🐉', price: 500, type: 'avatar' },
+    'alien': { name: 'Alien', icon: '👽', price: 1000, type: 'avatar' },
+
+    'defaultChatColor': { name: 'Default Black', color: '#333333', price: 0, type: 'chatColor' },
+    'redChat': { name: 'Red Text', color: '#e74c3c', price: 150, type: 'chatColor' },
+    'blueChat': { name: 'Blue Text', color: '#3498db', price: 150, type: 'chatColor' },
+    'goldChat': { name: 'Gold Text', color: '#f1c40f', price: 500, type: 'chatColor' },
+
+    'defaultCardBack': { name: 'Default Red', icon: '🃏', price: 0, type: 'cardBack' },
+    'blackCardBack': { name: 'Dark Mode Cards', icon: '🃏', price: 300, type: 'cardBack' },
+    'goldCardBack': { name: 'Golden Cards', icon: '🃏', price: 1000, type: 'cardBack' }
 };
 
 let colors = ['red', 'blue', 'green', 'yellow'];
 let values = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
 
-function createRoomState(roomId, name, password, maxPlayers, isPrivate, hostId, speedMode, noMercyMode, rankedMode) {
+function createRoomState(roomId, name, password, maxPlayers, isPrivate, hostId, speedMode, noMercyMode, rankedMode, zeroSevenMode) {
     return {
         id: roomId,
         name: name || `Room ${roomId}`,
@@ -59,6 +68,7 @@ function createRoomState(roomId, name, password, maxPlayers, isPrivate, hostId, 
         speedMode: speedMode || false,
         noMercyMode: noMercyMode || false,
         rankedMode: rankedMode || false,
+        zeroSevenMode: zeroSevenMode || false,
         hostId: hostId,
         players: {},
         deck: [],
@@ -301,12 +311,42 @@ function playBotTurn(room) {
                      }
                      if (room.deck.length > 0) victim.hand.push(room.deck.pop());
                  }
+            } else if (room.zeroSevenMode && cardToPlay.card.value === '0') {
+                // 0: Rotate hands
+                io.to(room.id).emit('chatMessage', { sender: "System", text: `${bot.name} played a 0. All hands are rotated!` });
+                let hands = playerIds.map(id => room.players[id].hand);
+                if (room.direction === 1) {
+                    // Rotate right
+                    let lastHand = hands.pop();
+                    hands.unshift(lastHand);
+                } else {
+                    // Rotate left
+                    let firstHand = hands.shift();
+                    hands.push(firstHand);
+                }
+                playerIds.forEach((id, idx) => {
+                    room.players[id].hand = hands[idx];
+                });
+            } else if (room.zeroSevenMode && cardToPlay.card.value === '7') {
+                // 7: Swap hands with random player
+                const otherPlayerIds = playerIds.filter(id => id !== currentPlayerId);
+                if (otherPlayerIds.length > 0) {
+                    const targetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
+                    const targetPlayer = room.players[targetId];
+                    io.to(room.id).emit('chatMessage', { sender: "System", text: `${bot.name} played a 7 and swapped hands with ${targetPlayer.name}!` });
+
+                    const tempHand = bot.hand;
+                    bot.hand = targetPlayer.hand;
+                    targetPlayer.hand = tempHand;
+                }
             }
 
-            // Check win
-            if (bot.hand.length === 0) {
-                handleWin(room, room.id, bot, currentPlayerId);
-                return;
+            // Check win conditions for all players after potential hand swaps
+            for (let pid of playerIds) {
+                if (room.players[pid].hand.length === 0) {
+                    handleWin(room, room.id, room.players[pid], pid);
+                    return;
+                }
             }
 
             nextTurn(room);
@@ -446,8 +486,17 @@ io.on('connection', (socket) => {
         if (!username || !usersDb[username]) return;
 
         const profile = usersDb[username];
-        if (profile.skins.includes(skinId)) {
-            profile.equippedSkin = skinId;
+        const skin = SKINS[skinId];
+
+        if (skin && profile.skins.includes(skinId)) {
+            if (skin.type === 'avatar') {
+                profile.equippedAvatar = skinId;
+            } else if (skin.type === 'chatColor') {
+                profile.equippedChatColor = skinId;
+            } else if (skin.type === 'cardBack') {
+                profile.equippedCardBack = skinId;
+            }
+
             saveUsers();
             socket.emit('profileUpdate', profile);
         }
@@ -455,7 +504,7 @@ io.on('connection', (socket) => {
 
     socket.on('createRoom', (data) => {
         const roomId = Math.random().toString(36).substring(2, 8);
-        rooms[roomId] = createRoomState(roomId, data.name, data.password, data.maxPlayers, data.isPrivate, socket.id, data.speedMode, data.noMercyMode, data.rankedMode);
+        rooms[roomId] = createRoomState(roomId, data.name, data.password, data.maxPlayers, data.isPrivate, socket.id, data.speedMode, data.noMercyMode, data.rankedMode, data.zeroSevenMode);
 
         socket.join(roomId);
 
@@ -674,12 +723,42 @@ io.on('connection', (socket) => {
                          victim.hand.push(room.deck.pop());
                      }
                 }
+            } else if (room.zeroSevenMode && cardToPlay.value === '0') {
+                // 0: Rotate hands
+                io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 0. All hands are rotated!` });
+                let hands = playerIds.map(id => room.players[id].hand);
+                if (room.direction === 1) {
+                    // Rotate right
+                    let lastHand = hands.pop();
+                    hands.unshift(lastHand);
+                } else {
+                    // Rotate left
+                    let firstHand = hands.shift();
+                    hands.push(firstHand);
+                }
+                playerIds.forEach((id, idx) => {
+                    room.players[id].hand = hands[idx];
+                });
+            } else if (room.zeroSevenMode && cardToPlay.value === '7') {
+                // 7: Swap hands with random player
+                const otherPlayerIds = playerIds.filter(id => id !== socket.id);
+                if (otherPlayerIds.length > 0) {
+                    const targetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
+                    const targetPlayer = room.players[targetId];
+                    io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 7 and swapped hands with ${targetPlayer.name}!` });
+
+                    const tempHand = player.hand;
+                    player.hand = targetPlayer.hand;
+                    targetPlayer.hand = tempHand;
+                }
             }
 
-            // Check win
-            if (player.hand.length === 0) {
-                handleWin(room, roomId, player, socket.id);
-                return;
+            // Check win conditions for all players after potential hand swaps
+            for (let pid of playerIds) {
+                if (room.players[pid].hand.length === 0) {
+                    handleWin(room, roomId, room.players[pid], pid);
+                    return;
+                }
             }
 
             nextTurn(room);
@@ -744,8 +823,15 @@ io.on('connection', (socket) => {
 
     socket.on('chatMessage', (roomId, msg) => {
         const username = socket.username || 'Player';
+        let chatColor = '#333333';
+        if (usersDb[username] && usersDb[username].equippedChatColor) {
+            const skinId = usersDb[username].equippedChatColor;
+            if (SKINS[skinId] && SKINS[skinId].color) {
+                chatColor = SKINS[skinId].color;
+            }
+        }
         // Send chat to everyone in the room
-        io.to(roomId).emit('chatMessage', { sender: username, text: msg });
+        io.to(roomId).emit('chatMessage', { sender: username, text: msg, color: chatColor });
     });
 
     socket.on('sendEmote', (roomId, emote) => {
