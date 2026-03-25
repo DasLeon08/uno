@@ -1,5 +1,99 @@
 const socket = io();
 
+// --- Audio System (Web Audio API) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(frequency, type, duration, vol=0.1) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+    gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + duration);
+}
+
+function playCardSound() {
+    // A quick 'swoosh' sound
+    playTone(150, 'triangle', 0.1, 0.2);
+    setTimeout(() => playTone(100, 'sine', 0.1, 0.1), 50);
+}
+
+function playTurnStartSound() {
+    // A friendly 'ping'
+    playTone(600, 'sine', 0.2, 0.1);
+    setTimeout(() => playTone(800, 'sine', 0.3, 0.1), 100);
+}
+
+function playVictorySound() {
+    // A little fanfare
+    const notes = [440, 554, 659, 880]; // A4, C#5, E5, A5
+    notes.forEach((freq, i) => {
+        setTimeout(() => playTone(freq, 'square', 0.2, 0.1), i * 150);
+    });
+    setTimeout(() => playTone(880, 'square', 0.6, 0.1), notes.length * 150);
+}
+
+function playDrawSound() {
+    // A soft paper slide sound
+    playTone(200, 'noise', 0.1, 0.05);
+}
+
+function playVoiceLine(type) {
+    if (type === 'Good Game!') {
+        playTone(440, 'sine', 0.1, 0.1);
+        setTimeout(() => playTone(554, 'sine', 0.1, 0.1), 150);
+        setTimeout(() => playTone(659, 'sine', 0.2, 0.1), 300);
+    } else if (type === 'Draw 4!') {
+        playTone(300, 'sawtooth', 0.2, 0.2);
+        setTimeout(() => playTone(250, 'sawtooth', 0.3, 0.2), 200);
+    } else if (type === 'Oh no...') {
+        playTone(300, 'triangle', 0.3, 0.1);
+        setTimeout(() => playTone(250, 'triangle', 0.4, 0.1), 300);
+    } else if (type === 'Well played!') {
+        playTone(500, 'sine', 0.1, 0.1);
+        setTimeout(() => playTone(600, 'sine', 0.2, 0.1), 150);
+    }
+}
+
+// --- Visual Effects ---
+function triggerConfetti() {
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+    for (let i = 0; i < 100; i++) {
+        const confetti = document.createElement('div');
+        confetti.classList.add('confetti');
+        confetti.style.left = Math.random() * 100 + 'vw';
+        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        confetti.style.animation = `fall ${Math.random() * 3 + 2}s linear forwards`;
+        document.body.appendChild(confetti);
+
+        setTimeout(() => confetti.remove(), 5000); // Cleanup
+    }
+}
+
+function triggerShake() {
+    document.body.classList.add('shake-animation');
+    setTimeout(() => {
+        document.body.classList.remove('shake-animation');
+    }, 500);
+}
+
+// Ensure AudioContext starts after user interaction
+document.body.addEventListener('click', () => {
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}, { once: true });
+// --- End Audio System ---
+
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
 const serverBrowserScreen = document.getElementById('server-browser-screen');
@@ -35,6 +129,7 @@ const chatMessages = document.getElementById('chat-messages');
 const chatInput = document.getElementById('chat-input');
 const chatSendBtn = document.getElementById('chat-send-btn');
 const emojiBtns = document.querySelectorAll('.emoji-btn');
+const quickChatBtns = document.querySelectorAll('.quick-chat-btn');
 
 const publicRoomsList = document.getElementById('public-rooms-list');
 const showCreateRoomBtn = document.getElementById('show-create-room-btn');
@@ -96,6 +191,15 @@ emojiBtns.forEach(btn => {
         }
         // Also add to chat input just in case
         chatInput.value += emote;
+    });
+});
+
+quickChatBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const text = e.target.textContent;
+        if (currentRoomId) {
+            socket.emit('chatMessage', currentRoomId, text);
+        }
     });
 });
 
@@ -186,10 +290,22 @@ createRoomConfirmBtn.addEventListener('click', () => {
     const roomPassword = document.getElementById('room-password-input').value;
     const maxPlayers = parseInt(document.getElementById('room-max-players').value);
     const isPrivate = document.getElementById('room-private-checkbox').checked;
+    const speedMode = document.getElementById('room-speed-checkbox').checked;
+    const noMercyMode = document.getElementById('room-nomercy-checkbox').checked;
+    const rankedMode = document.getElementById('room-ranked-checkbox').checked;
     const name = playerNameInput.value.trim() || 'Player';
 
     isHost = true;
-    socket.emit('createRoom', { name: roomName, password: roomPassword, maxPlayers, isPrivate, playerName: name });
+    socket.emit('createRoom', {
+        name: roomName,
+        password: roomPassword,
+        maxPlayers,
+        isPrivate,
+        speedMode,
+        noMercyMode,
+        rankedMode,
+        playerName: name
+    });
     createRoomModal.classList.add('hidden');
     serverBrowserScreen.classList.add('hidden');
 });
@@ -208,10 +324,32 @@ addBotBtn.addEventListener('click', () => {
 });
 
 deckDiv.addEventListener('click', () => {
-    if (isMyTurn && currentRoomId) {
+    if (isMyTurn && currentRoomId && !hasDrawnThisTurn) {
         socket.emit('drawCard', currentRoomId);
+        playDrawSound();
     }
 });
+
+const passTurnBtn = document.getElementById('pass-turn-btn');
+if (passTurnBtn) {
+    passTurnBtn.addEventListener('click', () => {
+        if (isMyTurn && currentRoomId && hasDrawnThisTurn) {
+            socket.emit('passTurn', currentRoomId);
+        }
+    });
+}
+
+const callUnoBtn = document.getElementById('call-uno-btn');
+if (callUnoBtn) {
+    callUnoBtn.addEventListener('click', () => {
+        if (currentRoomId) {
+            socket.emit('callUno', currentRoomId);
+            callUnoBtn.classList.add('hidden'); // Hide after clicking to prevent spam
+        }
+    });
+}
+
+let hasDrawnThisTurn = false;
 
 playAgainBtn.addEventListener('click', () => {
     if (currentRoomId) {
@@ -236,6 +374,7 @@ document.querySelectorAll('.color-btn').forEach(btn => {
         colorPicker.classList.add('hidden');
         if (pendingWildCardIndex !== null && currentRoomId) {
             socket.emit('playCard', currentRoomId, pendingWildCardIndex, selectedColor);
+            playCardSound();
             pendingWildCardIndex = null;
         }
     });
@@ -261,10 +400,11 @@ socket.on('publicRooms', (rooms) => {
             li.style.borderRadius = '3px';
 
             const info = document.createElement('span');
-            info.textContent = `${room.hasPassword ? '🔒 ' : ''}${room.name} (${room.players}/${room.maxPlayers})`;
+            let statusText = room.gameStarted ? " (In Progress - Spectate)" : ` (${room.players}/${room.maxPlayers})`;
+            info.textContent = `${room.hasPassword ? '🔒 ' : ''}${room.name}${statusText}`;
 
             const joinBtn = document.createElement('button');
-            joinBtn.textContent = 'Join';
+            joinBtn.textContent = room.gameStarted ? 'Spectate' : 'Join';
             joinBtn.style.padding = '5px 10px';
             joinBtn.addEventListener('click', () => {
                 let password = '';
@@ -315,6 +455,12 @@ socket.on('loginSuccess', (data) => {
 
     loginForm.classList.add('hidden');
     mainMenu.classList.remove('hidden');
+
+    renderShop();
+
+    if (data.dailyBonusAwarded) {
+        alert("🎉 Daily Login Bonus! You received 20 Coins! 🎉");
+    }
 });
 
 socket.on('profileUpdate', (profile) => {
@@ -342,12 +488,21 @@ socket.on('leaderboardUpdate', (entries) => {
         const tdWins = document.createElement('td');
         tdWins.textContent = entry.wins;
 
+        const tdGamesPlayed = document.createElement('td');
+        tdGamesPlayed.textContent = entry.gamesPlayed || 0;
+
+        const tdWinRate = document.createElement('td');
+        const winRate = entry.gamesPlayed > 0 ? Math.round((entry.wins / entry.gamesPlayed) * 100) : 0;
+        tdWinRate.textContent = `${winRate}%`;
+
         const tdCoins = document.createElement('td');
         tdCoins.textContent = entry.coins;
 
         tr.appendChild(tdRank);
         tr.appendChild(tdUsername);
         tr.appendChild(tdWins);
+        tr.appendChild(tdGamesPlayed);
+        tr.appendChild(tdWinRate);
         tr.appendChild(tdCoins);
 
         leaderboardTableBody.appendChild(tr);
@@ -399,13 +554,41 @@ socket.on('gameState', (state) => {
     
     // Check if it's my turn
     const me = state.players.find(p => p.id === myId);
-    if (me) {
+    if (state.isSpectator) {
+        isMyTurn = false;
+        myNameEl.textContent = "Spectating...";
+        myNameEl.classList.remove('my-turn');
+        if (callUnoBtn) callUnoBtn.classList.add('hidden');
+        if (passTurnBtn) passTurnBtn.classList.add('hidden');
+    } else if (me) {
+        const becameMyTurn = me.isCurrentTurn && !isMyTurn; // Just became my turn
         isMyTurn = me.isCurrentTurn;
+        hasDrawnThisTurn = state.hasDrawn; // Update local state
+
         myNameEl.textContent = `My Hand (${me.name}) ${isMyTurn ? " - MY TURN!" : ""}`;
         if (isMyTurn) {
             myNameEl.classList.add('my-turn');
+            if (becameMyTurn) playTurnStartSound();
         } else {
             myNameEl.classList.remove('my-turn');
+        }
+
+        // Handle UNO button visibility (only show when 1 or 2 cards left)
+        if (callUnoBtn) {
+            if (me.cardCount <= 2 && me.cardCount > 0 && !me.calledUno) {
+                callUnoBtn.classList.remove('hidden');
+            } else {
+                callUnoBtn.classList.add('hidden');
+            }
+        }
+
+        // Handle Pass Turn button visibility
+        if (passTurnBtn) {
+            if (isMyTurn && hasDrawnThisTurn) {
+                passTurnBtn.classList.remove('hidden');
+            } else {
+                passTurnBtn.classList.add('hidden');
+            }
         }
     }
 });
@@ -421,6 +604,17 @@ socket.on('chatMessage', (data) => {
 
     chatMessages.appendChild(p);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    // Shake effect for penalty cards
+    if (data.sender === "System" && data.text.includes("draws")) {
+        triggerShake();
+    }
+
+    // Play sound if it's a quick chat message
+    const presetMessages = ['Good Game!', 'Draw 4!', 'Oh no...', 'Well played!'];
+    if (presetMessages.includes(data.text)) {
+        playVoiceLine(data.text);
+    }
 });
 
 socket.on('playerEmote', (data) => {
@@ -452,8 +646,17 @@ socket.on('playerEmote', (data) => {
 socket.on('gameOver', (data) => {
     gameScreen.classList.add('hidden');
     gameOverScreen.classList.remove('hidden');
+
+    // Hide game specific buttons
+    if (callUnoBtn) callUnoBtn.classList.add('hidden');
+    if (passTurnBtn) passTurnBtn.classList.add('hidden');
+
     if (data.winnerName) {
         winnerMessage.textContent = `${data.winnerName} won the game!`;
+        triggerConfetti(); // Always trigger confetti for the winner globally
+        if (data.winnerId === myId) {
+            playVictorySound();
+        }
     } else {
         winnerMessage.textContent = data.reason || 'Game Over';
     }
@@ -500,6 +703,7 @@ function handleCardPlay(card, index) {
         colorPicker.classList.remove('hidden');
     } else {
         socket.emit('playCard', currentRoomId, index);
+        playCardSound();
     }
 }
 
@@ -570,44 +774,72 @@ function renderShop() {
     if (!shopData || !myProfile) return;
 
     shopItemsContainer.innerHTML = '';
-    for (const [id, item] of Object.entries(shopData)) {
-        const div = document.createElement('div');
-        div.className = 'shop-item';
 
-        const icon = document.createElement('span');
-        icon.className = 'avatar-icon';
-        icon.textContent = item.icon || '👤';
+    // Group items by type
+    const categories = {
+        'avatar': 'Avatars',
+        'chatColor': 'Chat Colors',
+        'cardBack': 'Card Backs'
+    };
 
-        const title = document.createElement('h4');
-        title.style.margin = '0';
-        title.textContent = item.name;
+    for (const [type, typeName] of Object.entries(categories)) {
+        const categoryDiv = document.createElement('div');
+        categoryDiv.style.gridColumn = '1 / -1';
+        categoryDiv.innerHTML = `<h3 style="margin-top: 20px; border-bottom: 1px solid #555; padding-bottom: 5px;">${typeName}</h3>`;
+        shopItemsContainer.appendChild(categoryDiv);
 
-        const price = document.createElement('p');
-        price.textContent = id === 'default' ? 'Free' : `${item.price} Coins`;
+        for (const [id, item] of Object.entries(shopData)) {
+            if (item.type !== type) continue;
 
-        div.appendChild(icon);
+            const div = document.createElement('div');
+            div.className = 'shop-item';
 
-        const actionBtn = document.createElement('button');
+            const icon = document.createElement('span');
+            icon.className = 'avatar-icon';
+            if (item.type === 'avatar') {
+                icon.textContent = item.icon || '👤';
+            } else if (item.type === 'chatColor') {
+                icon.style.display = 'inline-block';
+                icon.style.width = '40px';
+                icon.style.height = '40px';
+                icon.style.backgroundColor = item.color;
+                icon.style.borderRadius = '50%';
+                icon.textContent = '';
+            } else if (item.type === 'cardBack') {
+                icon.textContent = '🃏';
+            }
 
-        if (myProfile.skins.includes(id)) {
-            if (myProfile.equippedSkin === id) {
-                actionBtn.textContent = 'Equipped';
-                actionBtn.disabled = true;
+            const title = document.createElement('h4');
+            title.style.margin = '0';
+            title.textContent = item.name;
+
+            const price = document.createElement('p');
+            price.textContent = item.price === 0 ? 'Free' : `${item.price} Coins`;
+
+            div.appendChild(icon);
+
+            const actionBtn = document.createElement('button');
+
+            if (myProfile.skins.includes(id)) {
+                if (myProfile.equippedAvatar === id || myProfile.equippedChatColor === id || myProfile.equippedCardBack === id) {
+                    actionBtn.textContent = 'Equipped';
+                    actionBtn.disabled = true;
+                } else {
+                    actionBtn.textContent = 'Equip';
+                    actionBtn.addEventListener('click', () => socket.emit('equipSkin', id));
+                }
             } else {
-                actionBtn.textContent = 'Equip';
-                actionBtn.addEventListener('click', () => socket.emit('equipSkin', id));
+                actionBtn.textContent = 'Buy';
+                actionBtn.addEventListener('click', () => socket.emit('buySkin', id));
+                if (myProfile.coins < item.price) {
+                    actionBtn.disabled = true;
+                }
             }
-        } else {
-            actionBtn.textContent = 'Buy';
-            actionBtn.addEventListener('click', () => socket.emit('buySkin', id));
-            if (myProfile.coins < item.price) {
-                actionBtn.disabled = true;
-            }
-        }
 
-        div.appendChild(title);
-        div.appendChild(price);
-        div.appendChild(actionBtn);
-        shopItemsContainer.appendChild(div);
+            div.appendChild(title);
+            div.appendChild(price);
+            div.appendChild(actionBtn);
+            shopItemsContainer.appendChild(div);
+        }
     }
 }
