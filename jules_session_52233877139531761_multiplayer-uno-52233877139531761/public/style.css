@@ -238,6 +238,8 @@ li {
     height: 120px;
     border-radius: 10px;
     border: 2px solid white;
+    position: relative;
+    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -313,6 +315,54 @@ li {
 .card.green { background-color: #2ecc71; }
 .card.yellow { background-color: #f1c40f; color: #333; text-shadow: none; }
 .card.wild { background-color: #000; color: white; }
+
+/* Legendary Card Effects */
+@keyframes fireEffect {
+    0% { box-shadow: 0 0 10px #ff0000, 0 0 20px #ff7f00, 0 0 30px #ffff00, inset 0 0 20px #ff0000; }
+    50% { box-shadow: 0 0 20px #ff0000, 0 0 40px #ff7f00, 0 0 60px #ffff00, inset 0 0 30px #ff7f00; }
+    100% { box-shadow: 0 0 10px #ff0000, 0 0 20px #ff7f00, 0 0 30px #ffff00, inset 0 0 20px #ff0000; }
+}
+
+.legendary-fire {
+    animation: fireEffect 2s infinite alternate;
+    border-color: #ff7f00;
+}
+
+@keyframes matrixEffect {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 0% 100%; }
+}
+
+.legendary-matrix {
+    background: linear-gradient(180deg, #000 0%, #0f0 50%, #000 100%);
+    background-size: 100% 200%;
+    animation: matrixEffect 3s linear infinite;
+    color: #0f0;
+    border-color: #0f0;
+    text-shadow: 0 0 5px #0f0;
+}
+
+/* Victory Animations */
+.firework {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    animation: explode 1s ease-out forwards;
+}
+
+@keyframes explode {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(30); opacity: 0; }
+}
+
+.matrix-drop {
+    position: absolute;
+    color: #0f0;
+    font-family: monospace;
+    font-size: 20px;
+    animation: fall linear forwards;
+}
 
 .deck-card {
     background-color: #000;
@@ -551,4 +601,23 @@ li {
     font-size: 32px;
     display: block;
     margin-bottom: 5px;
+    transition: transform 0.2s;
+}
+
+/* Weather Particle Effects */
+.weather-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10;
+}
+
+@keyframes fallSnow {
+    0% { transform: translateY(-10px) translateX(0); opacity: 1; }
+    100% { transform: translateY(100vh) translateX(20px); opacity: 0; }
+}
+
+@keyframes floatBubble {
+    0% { transform: translateY(100vh) scale(0.5); opacity: 0; }
+    50% { opacity: 0.8; }
+    100% { transform: translateY(-10px) scale(1.5); opacity: 0; }
 }

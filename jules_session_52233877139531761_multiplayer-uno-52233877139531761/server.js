@@ -12,6 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Game State
 const rooms = {};
+const onlineUsers = {}; // Key: username, Value: socket.id
 
 const DB_FILE = 'users.json';
 
@@ -52,23 +53,34 @@ const SKINS = {
 
     'defaultCardBack': { name: 'Default Red', icon: '🃏', price: 0, type: 'cardBack' },
     'blackCardBack': { name: 'Dark Mode Cards', icon: '🃏', price: 300, type: 'cardBack' },
-    'goldCardBack': { name: 'Golden Cards', icon: '🃏', price: 1000, type: 'cardBack' }
+    'goldCardBack': { name: 'Golden Cards', icon: '🃏', price: 1000, type: 'cardBack' },
+    'legendaryFire': { name: 'Legendary Fire', icon: '🔥', price: 2000, type: 'cardBack', minLevel: 10 },
+    'legendaryMatrix': { name: 'Matrix Code', icon: '💻', price: 2000, type: 'cardBack', minLevel: 10 },
+
+    'defaultVictory': { name: 'Confetti', icon: '🎉', price: 0, type: 'victory' },
+    'fireworks': { name: 'Fireworks', icon: '🎆', price: 1000, type: 'victory' },
+    'matrixRain': { name: 'Matrix Rain', icon: '🌧️', price: 1500, type: 'victory' }
 };
 
 let colors = ['red', 'blue', 'green', 'yellow'];
 let values = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'skip', 'reverse', 'draw2'];
 
-function createRoomState(roomId, name, password, maxPlayers, isPrivate, hostId, speedMode, noMercyMode, rankedMode, zeroSevenMode) {
+function createRoomState(roomId, data, hostId) {
     return {
         id: roomId,
-        name: name || `Room ${roomId}`,
-        password: password || '',
-        maxPlayers: maxPlayers || 4,
-        isPrivate: isPrivate || false,
-        speedMode: speedMode || false,
-        noMercyMode: noMercyMode || false,
-        rankedMode: rankedMode || false,
-        zeroSevenMode: zeroSevenMode || false,
+        name: data.name || `Room ${roomId}`,
+        password: data.password || '',
+        maxPlayers: data.maxPlayers || 4,
+        isPrivate: data.isPrivate || false,
+        speedMode: data.speedMode || false,
+        noMercyMode: data.noMercyMode || false,
+        rankedMode: data.rankedMode || false,
+        zeroSevenMode: data.zeroSevenMode || false,
+        jumpInMode: data.jumpInMode || false,
+        drawUntilPlayMode: data.drawUntilPlayMode || false,
+        wildRouletteMode: data.wildRouletteMode || false,
+        teamMode: data.teamMode || false,
+        combinationsMode: data.combinationsMode || false,
         hostId: hostId,
         players: {},
         deck: [],
@@ -84,8 +96,33 @@ function createRoomState(roomId, name, password, maxPlayers, isPrivate, hostId, 
     };
 }
 
+function checkLevelUp(profile) {
+    if (profile.xp === undefined) return;
+    const newLevel = Math.floor(Math.sqrt(profile.xp / 100)) + 1;
+    if (newLevel > profile.level) {
+        profile.level = newLevel;
+    }
+    // Check title unlocks
+    if (profile.wins >= 10 && profile.unlockedTitles && !profile.unlockedTitles.includes('UNO-Meister')) {
+        profile.unlockedTitles.push('UNO-Meister');
+        profile.title = 'UNO-Meister'; // Auto-equip the new title
+    }
+}
+
 function handleWin(room, roomId, winningPlayer, winningPlayerId) {
     const playerIds = Object.keys(room.players);
+
+    let teammateId = null;
+    let teammate = null;
+
+    if (room.teamMode) {
+        const winnerIndex = playerIds.indexOf(winningPlayerId);
+        const teammateIndex = (winnerIndex + 2) % playerIds.length;
+        if (teammateIndex < playerIds.length) {
+            teammateId = playerIds[teammateIndex];
+            teammate = room.players[teammateId];
+        }
+    }
 
     // Update games played for everyone
     playerIds.forEach(pId => {
@@ -93,13 +130,25 @@ function handleWin(room, roomId, winningPlayer, winningPlayerId) {
         if (!p.isBot && usersDb[p.name]) {
             if (usersDb[p.name].gamesPlayed === undefined) usersDb[p.name].gamesPlayed = 0;
             usersDb[p.name].gamesPlayed += 1;
+            usersDb[p.name].xp += 20; // 20 XP for playing
+            checkLevelUp(usersDb[p.name]);
         }
     });
 
-    // Award coins and update leaderboard
+    // Award coins and update leaderboard for winner
     if (!winningPlayer.isBot && usersDb[winningPlayer.name]) {
         usersDb[winningPlayer.name].wins += 1;
         usersDb[winningPlayer.name].coins += 50; // Winner gets 50 coins
+        usersDb[winningPlayer.name].xp += 80; // Additional 80 XP for winning (Total 100)
+
+        if (room.zeroSevenMode) {
+            usersDb[winningPlayer.name].quests.win_07 += 1;
+            if (usersDb[winningPlayer.name].quests.win_07 === 2) { // Goal: 2 wins
+                usersDb[winningPlayer.name].coins += 50;
+            }
+        }
+
+        checkLevelUp(usersDb[winningPlayer.name]);
 
         const winnerSocket = io.sockets.sockets.get(winningPlayerId);
         if (winnerSocket) {
@@ -107,10 +156,31 @@ function handleWin(room, roomId, winningPlayer, winningPlayerId) {
         }
     }
 
-    // Award participation coins to other humans
+    // Award coins and update leaderboard for teammate (if applicable)
+    if (teammate && !teammate.isBot && usersDb[teammate.name]) {
+        usersDb[teammate.name].wins += 1;
+        usersDb[teammate.name].coins += 50; // Teammate also gets full 50 coins
+        usersDb[teammate.name].xp += 80; // Full win XP
+
+        if (room.zeroSevenMode) {
+            usersDb[teammate.name].quests.win_07 += 1;
+            if (usersDb[teammate.name].quests.win_07 === 2) {
+                usersDb[teammate.name].coins += 50;
+            }
+        }
+
+        checkLevelUp(usersDb[teammate.name]);
+
+        const teammateSocket = io.sockets.sockets.get(teammateId);
+        if (teammateSocket) {
+            teammateSocket.emit('profileUpdate', usersDb[teammate.name]);
+        }
+    }
+
+    // Award participation coins to other humans (losers)
     playerIds.forEach(id => {
         const p = room.players[id];
-        if (!p.isBot && id !== winningPlayerId && usersDb[p.name]) {
+        if (!p.isBot && id !== winningPlayerId && id !== teammateId && usersDb[p.name]) {
             usersDb[p.name].coins += 10;
             const loserSocket = io.sockets.sockets.get(id);
             if (loserSocket) {
@@ -122,7 +192,9 @@ function handleWin(room, roomId, winningPlayer, winningPlayerId) {
     saveUsers();
 
     io.emit('leaderboardUpdate', getLeaderboard());
-    io.to(roomId).emit('gameOver', { winnerName: winningPlayer.name, winnerId: winningPlayerId });
+
+    const victorySkin = usersDb[winningPlayer.name] ? usersDb[winningPlayer.name].equippedVictory : 'defaultVictory';
+    io.to(roomId).emit('gameOver', { winnerName: winningPlayer.name, winnerId: winningPlayerId, victorySkin: victorySkin });
     room.gameStarted = false;
     room.deck = [];
     room.discardPile = [];
@@ -397,15 +469,28 @@ io.on('connection', (socket) => {
                 coins: 0,
                 wins: 0,
                 gamesPlayed: 0,
-                skins: ['defaultAvatar', 'defaultChatColor', 'defaultCardBack'],
+                xp: 0,
+                level: 1,
+                title: 'Novice',
+                unlockedTitles: ['Novice'],
+                quests: { play_plus4: 0, call_uno: 0, win_07: 0 },
+                friends: [],
+                skins: ['defaultAvatar', 'defaultChatColor', 'defaultCardBack', 'defaultVictory'],
                 equippedAvatar: 'defaultAvatar',
                 equippedChatColor: 'defaultChatColor',
-                equippedCardBack: 'defaultCardBack'
+                equippedCardBack: 'defaultCardBack',
+                equippedVictory: 'defaultVictory'
             };
             saveUsers();
         } else {
             // Migrate old profiles
             if (usersDb[username].gamesPlayed === undefined) usersDb[username].gamesPlayed = 0;
+            if (usersDb[username].xp === undefined) usersDb[username].xp = 0;
+            if (usersDb[username].level === undefined) usersDb[username].level = 1;
+            if (usersDb[username].title === undefined) usersDb[username].title = 'Novice';
+            if (usersDb[username].unlockedTitles === undefined) usersDb[username].unlockedTitles = ['Novice'];
+            if (usersDb[username].quests === undefined) usersDb[username].quests = { play_plus4: 0, call_uno: 0, win_07: 0 };
+            if (usersDb[username].friends === undefined) usersDb[username].friends = [];
 
             if (usersDb[username].equippedSkin || !usersDb[username].equippedAvatar) {
                  if (usersDb[username].equippedSkin) {
@@ -419,10 +504,12 @@ io.on('connection', (socket) => {
 
                  if (!newSkins.includes('defaultChatColor')) newSkins.push('defaultChatColor');
                  if (!newSkins.includes('defaultCardBack')) newSkins.push('defaultCardBack');
+                 if (!newSkins.includes('defaultVictory')) newSkins.push('defaultVictory');
                  usersDb[username].skins = newSkins;
 
                  if (!usersDb[username].equippedChatColor) usersDb[username].equippedChatColor = 'defaultChatColor';
                  if (!usersDb[username].equippedCardBack) usersDb[username].equippedCardBack = 'defaultCardBack';
+                 if (!usersDb[username].equippedVictory) usersDb[username].equippedVictory = 'defaultVictory';
                  saveUsers();
             }
 
@@ -434,6 +521,7 @@ io.on('connection', (socket) => {
         }
 
         socket.username = username; // Attach to socket for easy access
+        onlineUsers[username] = socket.id;
 
         // Daily Login Bonus
         const today = new Date().toISOString().split('T')[0];
@@ -495,6 +583,8 @@ io.on('connection', (socket) => {
                 profile.equippedChatColor = skinId;
             } else if (skin.type === 'cardBack') {
                 profile.equippedCardBack = skinId;
+            } else if (skin.type === 'victory') {
+                profile.equippedVictory = skinId;
             }
 
             saveUsers();
@@ -504,7 +594,7 @@ io.on('connection', (socket) => {
 
     socket.on('createRoom', (data) => {
         const roomId = Math.random().toString(36).substring(2, 8);
-        rooms[roomId] = createRoomState(roomId, data.name, data.password, data.maxPlayers, data.isPrivate, socket.id, data.speedMode, data.noMercyMode, data.rankedMode, data.zeroSevenMode);
+        rooms[roomId] = createRoomState(roomId, data, socket.id);
 
         socket.join(roomId);
 
@@ -658,112 +748,192 @@ io.on('connection', (socket) => {
         if (!room || !room.gameStarted) return;
 
         const playerIds = Object.keys(room.players);
-        if (socket.id !== playerIds[room.currentPlayerIndex]) return;
-
         const player = room.players[socket.id];
 
-        // Validate cardIndex is within bounds
-        if (typeof cardIndex !== 'number' || cardIndex < 0 || cardIndex >= player.hand.length) return;
+        // Support array of indices for combinations mode or a single index
+        let indicesToPlay = Array.isArray(cardIndex) ? cardIndex : [cardIndex];
 
-        const cardToPlay = player.hand[cardIndex];
+        // Remove duplicates, sort descending so splicing doesn't mess up indices
+        indicesToPlay = [...new Set(indicesToPlay)].sort((a,b) => b-a);
+
+        // Basic check if all requested indices exist
+        for (let idx of indicesToPlay) {
+            if (typeof idx !== 'number' || idx < 0 || idx >= player.hand.length) return;
+        }
+
+        const cardsToPlay = indicesToPlay.map(idx => player.hand[idx]);
         const topCard = room.discardPile[room.discardPile.length - 1];
 
-        // Basic Validation
-        let isValid = cardToPlay.color === 'wild' ||
-                      cardToPlay.color === room.activeColor ||
-                      cardToPlay.value === topCard.value;
+        let isValid = false;
+        const isCurrentTurn = socket.id === playerIds[room.currentPlayerIndex];
 
-        if (isValid) {
-            // Player successfully played a card, reset hasDrawn
-            player.hasDrawn = false;
-
-            player.hand.splice(cardIndex, 1);
+        if (cardsToPlay.length > 1) {
+            // Validate combinations (only allowed if room flag set, must be same value, must be current turn for simplicity)
+            if (!room.combinationsMode || !isCurrentTurn) return;
             
-            if (cardToPlay.color === 'wild') {
-                room.activeColor = selectedColor || 'red';
-            } else {
-                room.activeColor = cardToPlay.color;
-            }
-            room.discardPile.push(cardToPlay);
+            const firstCard = cardsToPlay[0];
+            const allSameValue = cardsToPlay.every(c => c.value === firstCard.value);
+            if (!allSameValue) return; // Cannot combine different values
 
-            // UNO logic: Check if player forgot to call UNO
-            if (player.hand.length === 1 && !player.calledUno) {
-                // If they have 1 card left and didn't call UNO, they draw 2 cards.
-                io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} forgot to call UNO and draws 2 cards!` });
-                for(let i=0; i<2; i++){
-                    if (room.deck.length === 0) {
-                        room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                        shuffleDeck(room);
-                    }
-                    if (room.deck.length > 0) {
-                        player.hand.push(room.deck.pop());
-                    }
-                }
-            }
+            // To start a combo, at least one card must be playable on the top card
+            const anyPlayable = cardsToPlay.some(c => c.color === 'wild' || c.color === room.activeColor || c.value === topCard.value);
+            if (anyPlayable) isValid = true;
 
-            // Action cards logic
-            if (cardToPlay.value === 'reverse') {
-                room.direction *= -1;
-                if (playerIds.length === 2) {
-                     nextTurn(room);
-                }
-            } else if (cardToPlay.value === 'skip') {
-                nextTurn(room);
-            } else if (cardToPlay.value === 'draw2' || cardToPlay.value === 'wild4') {
-                const drawAmount = cardToPlay.value === 'draw2' ? 2 : 4;
-                nextTurn(room);
-                const victimId = playerIds[room.currentPlayerIndex];
-                const victim = room.players[victimId];
-                for(let i=0; i<drawAmount; i++) {
-                     if (room.deck.length === 0) {
-                         room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-                         shuffleDeck(room);
-                     }
-                     if (room.deck.length > 0) {
-                         victim.hand.push(room.deck.pop());
-                     }
-                }
-            } else if (room.zeroSevenMode && cardToPlay.value === '0') {
-                // 0: Rotate hands
-                io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 0. All hands are rotated!` });
-                let hands = playerIds.map(id => room.players[id].hand);
-                if (room.direction === 1) {
-                    // Rotate right
-                    let lastHand = hands.pop();
-                    hands.unshift(lastHand);
-                } else {
-                    // Rotate left
-                    let firstHand = hands.shift();
-                    hands.push(firstHand);
-                }
-                playerIds.forEach((id, idx) => {
-                    room.players[id].hand = hands[idx];
-                });
-            } else if (room.zeroSevenMode && cardToPlay.value === '7') {
-                // 7: Swap hands with random player
-                const otherPlayerIds = playerIds.filter(id => id !== socket.id);
-                if (otherPlayerIds.length > 0) {
-                    const targetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
-                    const targetPlayer = room.players[targetId];
-                    io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 7 and swapped hands with ${targetPlayer.name}!` });
-
-                    const tempHand = player.hand;
-                    player.hand = targetPlayer.hand;
-                    targetPlayer.hand = tempHand;
+        } else if (cardsToPlay.length === 1) {
+            const cardToPlay = cardsToPlay[0];
+            if (isCurrentTurn) {
+                isValid = cardToPlay.color === 'wild' ||
+                          cardToPlay.color === room.activeColor ||
+                          cardToPlay.value === topCard.value;
+            } else if (room.jumpInMode) {
+                // Jump-in validation
+                if (cardToPlay.color === topCard.color && cardToPlay.value === topCard.value && cardToPlay.color !== 'wild') {
+                    isValid = true;
+                    // Shift turn to the jumping player
+                    room.currentPlayerIndex = playerIds.indexOf(socket.id);
+                    io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} jumped in!` });
                 }
             }
-
-            // Check win conditions for all players after potential hand swaps
-            for (let pid of playerIds) {
-                if (room.players[pid].hand.length === 0) {
-                    handleWin(room, roomId, room.players[pid], pid);
-                    return;
-                }
-            }
-
-            nextTurn(room);
-            broadcastGameState(roomId);
         }
+
+        if (!isValid) return;
+
+        // Player successfully played cards
+        player.hasDrawn = false;
+
+        // Remove cards from hand (indices are sorted desc)
+        for (let idx of indicesToPlay) {
+            player.hand.splice(idx, 1);
+        }
+
+        let totalDrawAmount = 0;
+        let lastPlayedCard = cardsToPlay[0];
+
+        // Process all played cards
+        for (let i = cardsToPlay.length - 1; i >= 0; i--) {
+             let cardToPlay = cardsToPlay[i];
+             lastPlayedCard = cardToPlay;
+
+             if (cardToPlay.color === 'wild') {
+                // Only honor selected color if it's the only/last card, else default to red in a combo
+                room.activeColor = selectedColor || 'red';
+
+                if (room.wildRouletteMode) {
+                    const events = [
+                        () => {
+                            io.to(roomId).emit('chatMessage', { sender: "System", text: `Wild Roulette: Everyone draws 1 card!` });
+                            playerIds.forEach(pid => {
+                                if (room.deck.length === 0) {
+                                    room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                                    shuffleDeck(room);
+                                }
+                                if (room.deck.length > 0) room.players[pid].hand.push(room.deck.pop());
+                            });
+                        },
+                        () => {
+                            io.to(roomId).emit('chatMessage', { sender: "System", text: `Wild Roulette: Next player is skipped!` });
+                            room.currentPlayerIndex = getNextPlayerIndex(room);
+                        },
+                        () => {
+                            io.to(roomId).emit('chatMessage', { sender: "System", text: `Wild Roulette: Direction reversed!` });
+                            room.direction *= -1;
+                        }
+                    ];
+                    events[Math.floor(Math.random() * events.length)]();
+                }
+             } else {
+                 room.activeColor = cardToPlay.color;
+             }
+             room.discardPile.push(cardToPlay);
+
+             if (cardToPlay.value === 'reverse') {
+                 room.direction *= -1;
+                 if (playerIds.length === 2) nextTurn(room);
+             } else if (cardToPlay.value === 'skip') {
+                 nextTurn(room);
+             } else if (cardToPlay.value === 'draw2' || cardToPlay.value === 'wild4') {
+                 totalDrawAmount += (cardToPlay.value === 'draw2' ? 2 : 4);
+                 if (cardToPlay.value === 'wild4' && !player.isBot && usersDb[player.name]) {
+                     usersDb[player.name].quests.play_plus4 += 1;
+                     if (usersDb[player.name].quests.play_plus4 === 5) { // Goal 5
+                         usersDb[player.name].coins += 50;
+                     }
+                     if (usersDb[player.name].quests.play_plus4 >= 10 && !usersDb[player.name].unlockedTitles.includes('Der gnadenlose +4 Werfer')) {
+                         usersDb[player.name].unlockedTitles.push('Der gnadenlose +4 Werfer');
+                         usersDb[player.name].title = 'Der gnadenlose +4 Werfer'; // Auto-equip title
+                     }
+                     saveUsers();
+                 }
+             } else if (room.zeroSevenMode && cardToPlay.value === '0') {
+                 io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 0. All hands are rotated!` });
+                 let hands = playerIds.map(id => room.players[id].hand);
+                 if (room.direction === 1) {
+                     let lastHand = hands.pop();
+                     hands.unshift(lastHand);
+                 } else {
+                     let firstHand = hands.shift();
+                     hands.push(firstHand);
+                 }
+                 playerIds.forEach((id, idx) => {
+                     room.players[id].hand = hands[idx];
+                 });
+             } else if (room.zeroSevenMode && cardToPlay.value === '7') {
+                 const otherPlayerIds = playerIds.filter(id => id !== socket.id);
+                 if (otherPlayerIds.length > 0) {
+                     const targetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
+                     const targetPlayer = room.players[targetId];
+                     io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} played a 7 and swapped hands with ${targetPlayer.name}!` });
+                     const tempHand = player.hand;
+                     player.hand = targetPlayer.hand;
+                     targetPlayer.hand = tempHand;
+                 }
+             }
+        }
+
+        // Apply stacked draw penalties
+        if (totalDrawAmount > 0) {
+            nextTurn(room);
+            const victimId = playerIds[room.currentPlayerIndex];
+            const victim = room.players[victimId];
+            for(let i=0; i<totalDrawAmount; i++) {
+                 if (room.deck.length === 0) {
+                     room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                     shuffleDeck(room);
+                 }
+                 if (room.deck.length > 0) victim.hand.push(room.deck.pop());
+            }
+        }
+
+        // UNO logic: Check if player forgot to call UNO
+        if (player.hand.length === 1 && !player.calledUno) {
+            io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} forgot to call UNO and draws 2 cards!` });
+            for(let i=0; i<2; i++){
+                if (room.deck.length === 0) {
+                    room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                    shuffleDeck(room);
+                }
+                if (room.deck.length > 0) player.hand.push(room.deck.pop());
+            }
+        }
+
+        // Check win conditions for all players after potential hand swaps
+        for (let pid of playerIds) {
+            if (room.players[pid].hand.length === 0) {
+                if (room.teamMode) {
+                    const winnerIndex = playerIds.indexOf(pid);
+                    const teammateIndex = (winnerIndex + 2) % playerIds.length;
+                    if (teammateIndex < playerIds.length) {
+                        const teammateId = playerIds[teammateIndex];
+                        io.to(roomId).emit('chatMessage', { sender: "System", text: `${room.players[pid].name} and ${room.players[teammateId].name} win the game!` });
+                    }
+                }
+                handleWin(room, roomId, room.players[pid], pid);
+                return;
+            }
+        }
+
+        nextTurn(room);
+        broadcastGameState(roomId);
     });
 
     socket.on('drawCard', (roomId) => {
@@ -773,22 +943,42 @@ io.on('connection', (socket) => {
          const playerIds = Object.keys(room.players);
          if (socket.id !== playerIds[room.currentPlayerIndex]) return;
 
-         // Draw single card
-         if (room.deck.length === 0) {
-            room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
-            shuffleDeck(room);
-         }
-
          const currentPlayer = room.players[socket.id];
 
-         // Only allow drawing if they haven't already drawn this turn
-         if (!currentPlayer.hasDrawn) {
-             if (room.deck.length > 0) {
-                 currentPlayer.hand.push(room.deck.pop());
-                 currentPlayer.hasDrawn = true;
+         if (room.drawUntilPlayMode) {
+            // Draw until a playable card is found
+            let playableFound = false;
+            while (!playableFound) {
+                if (room.deck.length === 0) {
+                    room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                    shuffleDeck(room);
+                    if (room.deck.length === 0) break; // Deck and discard both empty (rare)
+                }
+                const drawnCard = room.deck.pop();
+                currentPlayer.hand.push(drawnCard);
+
+                const topCard = room.discardPile[room.discardPile.length - 1];
+                if (drawnCard.color === 'wild' || drawnCard.color === room.activeColor || drawnCard.value === topCard.value) {
+                    playableFound = true;
+                }
+            }
+            broadcastGameState(roomId);
+         } else {
+             // Draw single card
+             if (room.deck.length === 0) {
+                room.deck = room.discardPile.splice(0, room.discardPile.length - 1);
+                shuffleDeck(room);
              }
-             // Do NOT automatically call nextTurn(). Wait for player to play or pass.
-             broadcastGameState(roomId);
+
+             // Only allow drawing if they haven't already drawn this turn
+             if (!currentPlayer.hasDrawn) {
+                 if (room.deck.length > 0) {
+                     currentPlayer.hand.push(room.deck.pop());
+                     currentPlayer.hasDrawn = true;
+                 }
+                 // Do NOT automatically call nextTurn(). Wait for player to play or pass.
+                 broadcastGameState(roomId);
+             }
          }
     });
 
@@ -818,6 +1008,15 @@ io.on('connection', (socket) => {
         if (player.hand.length === 1 || player.hand.length === 2) {
             player.calledUno = true;
             io.to(roomId).emit('chatMessage', { sender: "System", text: `${player.name} called UNO!` });
+
+            if (!player.isBot && usersDb[player.name]) {
+                usersDb[player.name].quests.call_uno += 1;
+                if (usersDb[player.name].quests.call_uno === 3) { // Goal 3
+                    usersDb[player.name].coins += 50;
+                    socket.emit('profileUpdate', usersDb[player.name]);
+                    saveUsers();
+                }
+            }
         }
     });
 
@@ -863,9 +1062,34 @@ io.on('connection', (socket) => {
         socket.leave(roomId);
     });
 
+    socket.on('addFriend', (friendName) => {
+        const username = socket.username;
+        if (!username || !usersDb[username]) return;
+
+        if (usersDb[friendName] && friendName !== username && !usersDb[username].friends.includes(friendName)) {
+            usersDb[username].friends.push(friendName);
+            saveUsers();
+            socket.emit('profileUpdate', usersDb[username]);
+            socket.emit('chatMessage', 'System', `Added ${friendName} to your friends list.`);
+        } else {
+            socket.emit('chatMessage', 'System', `Could not add ${friendName}. Check spelling or already added.`);
+        }
+    });
+
+    socket.on('inviteFriend', (friendName, roomId) => {
+        const friendSocketId = onlineUsers[friendName];
+        if (friendSocketId) {
+            io.to(friendSocketId).emit('friendInvite', { sender: socket.username, roomId: roomId });
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         
+        if (socket.username) {
+            delete onlineUsers[socket.username];
+        }
+
         // Find room user was in
         let userRoomId = null;
         for (const roomId in rooms) {
@@ -954,6 +1178,8 @@ function getLeaderboard() {
     return Object.entries(usersDb)
         .map(([username, data]) => ({
             username,
+            title: data.title || 'Novice',
+            level: data.level || 1,
             wins: data.wins,
             coins: data.coins,
             gamesPlayed: data.gamesPlayed || 0
