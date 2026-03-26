@@ -1342,6 +1342,7 @@ io.on('connection', (socket) => {
 
 function getLeaderboard() {
     return Object.entries(usersDb)
+        .filter(([username]) => !username.startsWith('Bot '))
         .map(([username, data]) => ({
             username,
             title: data.title || 'Novice',

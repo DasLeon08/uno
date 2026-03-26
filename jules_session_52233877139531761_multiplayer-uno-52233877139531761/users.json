@@ -30,7 +30,7 @@
   },
   "TestUser": {
     "password": "password123",
-    "coins": 20,
+    "coins": 40,
     "wins": 0,
     "gamesPlayed": 0,
     "xp": 0,
@@ -55,7 +55,7 @@
     "equippedChatColor": "defaultChatColor",
     "equippedCardBack": "defaultCardBack",
     "equippedVictory": "defaultVictory",
-    "lastLoginDate": "2026-03-25"
+    "lastLoginDate": "2026-03-26"
   },
   "TestUser2": {
     "password": "password123",
