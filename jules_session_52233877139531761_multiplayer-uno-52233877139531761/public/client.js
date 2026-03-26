@@ -1119,8 +1119,8 @@ function renderDiscardPile(topCard, activeColor) {
 
         if (topCard.color === 'wild' && activeColor) {
             // Visualize the chosen color for wild cards
-            cardEl.style.boxShadow = `0 0 15px ${activeColor}`;
-            cardEl.style.borderColor = activeColor;
+            cardEl.classList.remove('wild');
+            cardEl.classList.add(activeColor);
         }
         discardPileDiv.appendChild(cardEl);
     }
